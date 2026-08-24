@@ -20,7 +20,8 @@ tell me and I'll switch it.)
 
 ## Step 1 — create the two repos
 
-Run this in Terminal from the `TopKid Business Folder`:
+This folder is already a git repo with the first commit made, so this is one
+command. Paste it into Terminal:
 
 ```bash
 cd "/Users/topkid/TopKid Business Folder/TopKid Dashboard Site" && gh repo create topkid-dashboard --public --source=. --remote=origin --push && gh repo create topkid-dashboard-data --private --add-readme
@@ -29,8 +30,11 @@ cd "/Users/topkid/TopKid Business Folder/TopKid Dashboard Site" && gh repo creat
 ## Step 2 — turn on GitHub Pages
 
 ```bash
-gh api -X POST repos/TopKidEvents/topkid-dashboard/pages -f "source[branch]=main" -f "source[path]=/"
+echo '{"source":{"branch":"main","path":"/"}}' | gh api -X POST repos/TopKidEvents/topkid-dashboard/pages --input -
 ```
+
+If that errors, do it by hand instead: the repo's **Settings → Pages →
+Source: Deploy from a branch → main → / (root) → Save**.
 
 Give it a minute, then your dashboard is live at:
 
