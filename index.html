@@ -1,0 +1,2868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#c727d5">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="TopKid">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<title>TopKid Events — Business Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bree+Serif&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+/* ============================================================
+   TopKid Events — Local Business Dashboard
+   Single file. No server. Data lives in this browser's
+   localStorage, and can be exported/imported as JSON.
+   ============================================================ */
+
+/* ---------- Tokens: light ---------- */
+:root{
+  color-scheme: light;
+  --bg:#f4f3f8;
+  --surface:#ffffff;
+  --surface-2:#faf9fc;
+  --surface-3:#f1eff7;
+  --ink:#111118;
+  --ink-2:#3d3d4a;
+  --muted:#6b6b78;
+  --rule:#e6e5ee;
+  --rule-strong:#d3d2df;
+
+  --purple:#c727d5;
+  --purple-dark:#a01fb0;
+  --purple-soft:#f9e9fb;
+  --green:#12a150;
+  --green-bright:#4cd964;
+  --green-soft:#e6f6ec;
+
+  /* categorical series — validated (light): CVD ΔE 20.9, normal ΔE 42.3, both ≥3:1 */
+  --series-1:#c727d5;   /* Fundraising */
+  --series-2:#12a150;   /* Summer Camp */
+  --series-other:#6b6b78;
+
+  /* status — always shipped with a label, never colour alone */
+  --good:#12784a; --good-bg:#e6f4ec;
+  --warn:#8a5a00; --warn-bg:#fdf1dc;
+  --crit:#b02222; --crit-bg:#fbe9e9;
+  --info:#2a5fb0; --info-bg:#e8effa;
+
+  --grid:#ececf3;
+  --shadow:0 1px 2px rgba(17,17,24,.05), 0 8px 24px rgba(17,17,24,.06);
+  --shadow-lg:0 12px 40px rgba(17,17,24,.18);
+  --r:14px; --r-sm:9px;
+}
+/* ---------- Tokens: dark ---------- */
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg:#101015;
+    --surface:#1a1a21;
+    --surface-2:#20202a;
+    --surface-3:#272733;
+    --ink:#f3f2f7;
+    --ink-2:#cfcedb;
+    --muted:#a09eb0;
+    --rule:#2c2c38;
+    --rule-strong:#3b3b49;
+    --purple:#d95ce4;
+    --purple-dark:#e07eea;
+    --purple-soft:#2e1733;
+    --green:#2ba75f;
+    --green-bright:#4cd964;
+    --green-soft:#122a1c;
+    --series-1:#c727d5;
+    --series-2:#2ba75f;
+    --series-other:#8f8da0;
+    --good:#4cc98a; --good-bg:#14301f;
+    --warn:#e0a83c; --warn-bg:#332714;
+    --crit:#f07171; --crit-bg:#361a1a;
+    --info:#79a8f0; --info-bg:#16233a;
+    --grid:#2a2a34;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+    --shadow-lg:0 12px 40px rgba(0,0,0,.55);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#101015; --surface:#1a1a21; --surface-2:#20202a; --surface-3:#272733;
+  --ink:#f3f2f7; --ink-2:#cfcedb; --muted:#a09eb0; --rule:#2c2c38; --rule-strong:#3b3b49;
+  --purple:#d95ce4; --purple-dark:#e07eea; --purple-soft:#2e1733;
+  --green:#2ba75f; --green-bright:#4cd964; --green-soft:#122a1c;
+  --series-1:#c727d5; --series-2:#2ba75f; --series-other:#8f8da0;
+  --good:#4cc98a; --good-bg:#14301f;
+  --warn:#e0a83c; --warn-bg:#332714;
+  --crit:#f07171; --crit-bg:#361a1a;
+  --info:#79a8f0; --info-bg:#16233a;
+  --grid:#2a2a34;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+  --shadow-lg:0 12px 40px rgba(0,0,0,.55);
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:'DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  background:var(--bg); color:var(--ink);
+  font-size:15px; line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{font-family:'Bree Serif',Georgia,serif;font-weight:400;margin:0;line-height:1.2}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--purple-dark)}
+.wordmark{font-family:'Bree Serif',Georgia,serif}
+.wordmark .t{color:var(--purple)} .wordmark .k{color:var(--green-bright)}
+
+/* ---------- Shell ---------- */
+.app{display:flex;min-height:100vh}
+.sidebar{
+  width:236px;flex:0 0 236px;background:var(--surface);border-right:1px solid var(--rule);
+  padding:20px 14px;position:sticky;top:0;height:100vh;overflow-y:auto;
+}
+.brand{display:flex;align-items:baseline;gap:8px;padding:0 8px 4px}
+.brand .logo{font-size:25px}
+.brand .sub{font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.navlist{margin-top:18px;display:flex;flex-direction:column;gap:2px}
+.navsec{font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);padding:14px 10px 6px;font-weight:700}
+.navbtn{
+  display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+  background:none;border:0;border-radius:9px;padding:9px 10px;color:var(--ink-2);font-size:14.5px;
+}
+.navbtn:hover{background:var(--surface-3)}
+.navbtn[aria-current="true"]{background:var(--purple-soft);color:var(--purple-dark);font-weight:700}
+.navbtn .ic{width:19px;text-align:center;font-size:15px}
+.navbtn .badge{margin-left:auto;background:var(--crit-bg);color:var(--crit);font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px}
+.navbtn .badge.q{background:var(--surface-3);color:var(--muted)}
+.sidefoot{margin-top:22px;padding:12px 10px 0;border-top:1px solid var(--rule);font-size:12px;color:var(--muted)}
+
+.main{flex:1;min-width:0;padding:24px 30px 80px;max-width:1500px}
+.topbar{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+.topbar h1{font-size:27px;color:var(--purple-dark)}
+.topbar .lede{color:var(--muted);font-size:13.5px;margin-top:3px}
+.topbar .spacer{flex:1}
+
+/* ---------- Buttons / chips ---------- */
+.btn{
+  border:1px solid var(--rule-strong);background:var(--surface);border-radius:9px;
+  padding:7px 13px;font-size:13.5px;font-weight:500;color:var(--ink-2);
+}
+.btn:hover{background:var(--surface-3);border-color:var(--muted)}
+.btn.primary{background:var(--purple);border-color:var(--purple);color:#fff}
+.btn.primary:hover{background:var(--purple-dark);border-color:var(--purple-dark)}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--muted)}
+.btn.ghost:hover{background:var(--surface-3);color:var(--ink)}
+.btn.sm{padding:4px 9px;font-size:12.5px;border-radius:7px}
+.btn.danger{color:var(--crit);border-color:var(--rule-strong)}
+.btn.danger:hover{background:var(--crit-bg);border-color:var(--crit)}
+.chiprow{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+.chip{
+  border:1px solid var(--rule-strong);background:var(--surface);border-radius:999px;
+  padding:4px 12px;font-size:12.5px;color:var(--ink-2);
+}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg);font-weight:700}
+.tag{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:700;letter-spacing:.01em}
+.tag.good{background:var(--good-bg);color:var(--good)}
+.tag.warn{background:var(--warn-bg);color:var(--warn)}
+.tag.crit{background:var(--crit-bg);color:var(--crit)}
+.tag.info{background:var(--info-bg);color:var(--info)}
+.tag.neutral{background:var(--surface-3);color:var(--muted)}
+.tag.brand{background:var(--purple-soft);color:var(--purple-dark)}
+
+/* ---------- Cards / grid ---------- */
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.g-2-1{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
+.g-1-2{grid-template-columns:minmax(0,1fr) minmax(0,2fr)}
+.card{
+  background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);
+  padding:18px;box-shadow:var(--shadow);min-width:0;
+}
+.card.flush{padding:0;overflow:hidden}
+.card h3{font-size:16px;color:var(--ink)}
+.cardhead{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.cardhead .spacer{flex:1}
+.cardhead .hint{font-size:12px;color:var(--muted)}
+.sectitle{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:26px 0 10px}
+
+/* ---------- Stat tiles ---------- */
+.stat{background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);padding:16px 17px;box-shadow:var(--shadow)}
+.stat .lbl{font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.stat .val{font-family:'Bree Serif',Georgia,serif;font-size:31px;line-height:1.15;margin-top:6px;letter-spacing:-.01em}
+.stat .sub{font-size:12.5px;color:var(--muted);margin-top:4px}
+.stat .val small{font-size:16px;color:var(--muted);font-family:'DM Sans',sans-serif}
+
+/* ---------- Meters ---------- */
+.meter{height:9px;border-radius:999px;background:var(--surface-3);overflow:hidden;margin-top:8px}
+.meter > i{display:block;height:100%;border-radius:999px;background:var(--purple)}
+.meter.g > i{background:var(--green)}
+.meterrow{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted);margin-top:6px}
+
+/* ---------- Tables ---------- */
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:9px 10px;border-bottom:1px solid var(--rule)}
+td{padding:10px;border-bottom:1px solid var(--rule);vertical-align:top}
+tbody tr:last-child td{border-bottom:0}
+tbody tr.click:hover{background:var(--surface-2);cursor:pointer}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+
+/* ---------- Empty state ---------- */
+.empty{text-align:center;padding:34px 18px;color:var(--muted);font-size:13.5px}
+.empty .big{font-size:26px;margin-bottom:8px;opacity:.55}
+
+/* ---------- Forms / modal ---------- */
+.modal-back{position:fixed;inset:0;background:rgba(12,12,18,.55);display:flex;align-items:flex-start;justify-content:center;padding:5vh 16px;z-index:900;overflow-y:auto}
+.modal{background:var(--surface);border-radius:16px;box-shadow:var(--shadow-lg);width:min(680px,100%);border:1px solid var(--rule)}
+.modal header{display:flex;align-items:center;gap:12px;padding:18px 20px;border-bottom:1px solid var(--rule)}
+.modal header h3{font-size:19px;color:var(--purple-dark);flex:1}
+.modal .body{padding:20px;display:grid;gap:14px}
+.modal footer{display:flex;gap:9px;justify-content:flex-end;padding:14px 20px;border-top:1px solid var(--rule);background:var(--surface-2);border-radius:0 0 16px 16px}
+.field label{display:block;font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:5px}
+.field .help{font-size:12px;color:var(--muted);margin-top:4px}
+input[type=text],input[type=date],input[type=month],input[type=number],input[type=email],input[type=tel],input[type=url],input[type=password],select,textarea{
+  width:100%;padding:9px 11px;border:1px solid var(--rule-strong);border-radius:9px;background:var(--surface-2);
+}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--purple);outline-offset:1px;background:var(--surface)}
+textarea{min-height:84px;resize:vertical;font-family:inherit}
+.field.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.checkrow{display:flex;gap:14px;flex-wrap:wrap}
+.checkrow label{display:flex;align-items:center;gap:6px;font-size:13.5px;text-transform:none;letter-spacing:0;color:var(--ink-2);font-weight:400;margin:0}
+
+/* ---------- Quote ---------- */
+.quotecard{
+  background:linear-gradient(135deg,var(--purple-soft),var(--surface) 68%);
+  border:1px solid var(--rule);border-radius:var(--r);padding:22px 24px;box-shadow:var(--shadow);
+  display:flex;gap:18px;align-items:flex-start;
+}
+.quotecard .mark{font-family:'Bree Serif',serif;font-size:46px;color:var(--purple);line-height:.8;opacity:.55}
+.quotecard blockquote{margin:0;font-family:'Bree Serif',Georgia,serif;font-size:20px;line-height:1.35}
+.quotecard cite{display:block;font-style:normal;font-size:13px;color:var(--muted);margin-top:9px;font-family:'DM Sans',sans-serif}
+
+/* ---------- Charts ---------- */
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2);margin-bottom:10px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:11px;height:11px;border-radius:3px;display:inline-block}
+.chartwrap{position:relative;overflow-x:auto}
+.tip{
+  position:fixed;z-index:800;pointer-events:none;background:var(--ink);color:var(--bg);
+  border-radius:8px;padding:8px 11px;font-size:12.5px;box-shadow:var(--shadow-lg);max-width:250px;
+}
+.tip b{color:var(--bg)}
+.tip .r{display:flex;justify-content:space-between;gap:14px}
+.sparkwrap{height:34px}
+
+/* ---------- Map ---------- */
+#map{height:430px;border-radius:var(--r);z-index:1}
+.leaflet-popup-content{font-family:'DM Sans',sans-serif;font-size:13px;margin:11px 13px}
+.mapfallback{height:430px;background:var(--surface-2);border-radius:var(--r);position:relative}
+
+/* ---------- Todos ---------- */
+.todoitem{display:flex;gap:11px;align-items:flex-start;padding:11px 4px;border-bottom:1px solid var(--rule)}
+.todoitem:last-child{border-bottom:0}
+.todoitem .cb{width:19px;height:19px;flex:0 0 19px;border:2px solid var(--rule-strong);border-radius:6px;background:transparent;margin-top:2px;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;padding:0}
+.todoitem .cb:hover{border-color:var(--purple)}
+.todoitem.done .cb{background:var(--green);border-color:var(--green)}
+.todoitem.done .ttl{text-decoration:line-through;color:var(--muted)}
+.todoitem .body{flex:1;min-width:0}
+.todoitem .ttl{font-size:14.5px;line-height:1.35}
+.todoitem .meta{display:flex;gap:9px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--muted);margin-top:4px}
+.todoitem .acts{opacity:0;display:flex;gap:4px}
+.todoitem:hover .acts{opacity:1}
+.quickadd{display:flex;gap:8px;margin-bottom:6px}
+.quickadd input{flex:1}
+
+/* ---------- Timeline ---------- */
+.tl{position:relative;padding-left:22px}
+.tl::before{content:"";position:absolute;left:6px;top:6px;bottom:6px;width:2px;background:var(--rule)}
+.tlitem{position:relative;padding:0 0 16px}
+.tlitem::before{content:"";position:absolute;left:-21px;top:5px;width:10px;height:10px;border-radius:50%;background:var(--purple);border:2px solid var(--surface)}
+.tlitem .d{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.tlitem .t{font-size:14px;margin-top:2px}
+.tlitem .n{font-size:13px;color:var(--muted);margin-top:3px;white-space:pre-wrap}
+
+/* ---------- Detail drawer ---------- */
+.drawer-back{position:fixed;inset:0;background:rgba(12,12,18,.5);z-index:880;display:flex;justify-content:flex-end}
+.drawer{background:var(--bg);width:min(720px,100%);height:100%;overflow-y:auto;box-shadow:var(--shadow-lg);border-left:1px solid var(--rule)}
+.drawer .dhead{position:sticky;top:0;background:var(--surface);border-bottom:1px solid var(--rule);padding:18px 22px;display:flex;gap:12px;align-items:flex-start;z-index:2}
+.drawer .dhead h2{font-size:22px;color:var(--purple-dark)}
+.drawer .dbody{padding:20px 22px 60px;display:grid;gap:16px}
+.kv{display:grid;grid-template-columns:132px 1fr;gap:6px 14px;font-size:13.5px}
+.kv dt{color:var(--muted);font-size:12px;letter-spacing:.05em;text-transform:uppercase;font-weight:700;padding-top:1px}
+.kv dd{margin:0}
+
+/* ---------- Banner ---------- */
+.banner{display:flex;gap:12px;align-items:center;padding:11px 15px;border-radius:11px;font-size:13.5px;margin-bottom:16px;border:1px solid}
+.banner.warn{background:var(--warn-bg);color:var(--warn);border-color:transparent}
+.banner.info{background:var(--info-bg);color:var(--info);border-color:transparent}
+.banner .spacer{flex:1}
+
+.mono{font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.small{font-size:12.5px}
+.nowrap{white-space:nowrap}
+.hidden{display:none !important}
+.scrolly{max-height:340px;overflow-y:auto}
+
+@media (max-width:1100px){
+  .g4{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .g3{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .g-2-1,.g-1-2{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:820px){
+  .app{flex-direction:column}
+  .sidebar{
+    width:100%;flex:none;height:auto;position:sticky;top:0;z-index:50;
+    border-right:0;border-bottom:1px solid var(--rule);padding:10px 0 8px;overflow:visible;
+  }
+  .brand{padding:0 14px 8px}
+  .brand .logo{font-size:21px}
+  .navlist{
+    flex-direction:row;flex-wrap:nowrap;overflow-x:auto;gap:4px;margin-top:0;
+    padding:0 12px 4px;scrollbar-width:none;-webkit-overflow-scrolling:touch;
+  }
+  .navlist::-webkit-scrollbar{display:none}
+  .navbtn{width:auto;white-space:nowrap;padding:8px 12px;font-size:14px}
+  .navsec{display:none}
+  .sidefoot{display:none}
+  .main{padding:16px 14px 90px}
+  .g2,.g3,.g4{grid-template-columns:minmax(0,1fr)}
+  .topbar h1{font-size:23px}
+  .card{padding:15px}
+  /* wide tables scroll inside their own card, never the page */
+  .card.flush{overflow-x:auto}
+  table{min-width:540px}
+  .kv{grid-template-columns:1fr;gap:2px 0}
+  .kv dd{margin-bottom:9px}
+  .drawer{width:100%}
+  .drawer .dhead{padding:14px 16px}
+  .drawer .dbody{padding:16px 16px 70px}
+  .modal-back{padding:0;align-items:stretch}
+  .modal{width:100%;border-radius:0;min-height:100%}
+  .modal footer{border-radius:0;position:sticky;bottom:0}
+  .field.row2{grid-template-columns:1fr}
+  .quotecard{padding:17px}
+  .quotecard blockquote{font-size:17px}
+  .stat .val{font-size:26px}
+  .todoitem .acts{opacity:1}
+  .chiprow input[type=text]{max-width:100% !important;width:100%}
+  /* banners stack instead of squeezing into columns */
+  .banner{flex-direction:column;align-items:flex-start;gap:8px}
+  .banner .spacer{display:none}
+  .banner .btn{width:100%}
+  .topbar .chiprow{width:100%}
+  .topbar .chiprow .btn{flex:1}
+  #map,.mapfallback{height:320px}
+}
+/* mobile-only bottom bar for the two things you do most */
+.mobilebar{display:none}
+@media (max-width:820px){
+  .mobilebar{
+    display:flex;position:fixed;left:0;right:0;bottom:0;z-index:60;gap:8px;padding:9px 12px;
+    padding-bottom:calc(9px + env(safe-area-inset-bottom));
+    background:var(--surface);border-top:1px solid var(--rule);box-shadow:0 -3px 14px rgba(0,0,0,.07);
+  }
+  .mobilebar .btn{flex:1;text-align:center}
+}
+@media print{
+  .sidebar,.btn,.chiprow{display:none !important}
+  .main{padding:0}
+  .card{break-inside:avoid;box-shadow:none}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="sidebar" id="sidebar"></nav>
+  <main class="main" id="main"></main>
+</div>
+<div id="overlay"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* =====================================================================
+   1. SEED DATA
+   Everything below is the starting point. Edit it in the app (changes
+   save to this browser) or edit this block directly to change defaults.
+   ===================================================================== */
+const SEED = {
+  meta: {
+    business: "TopKid Events",
+    tagline: "Character Development. Unforgettable Summer.",
+    owner: "Coach Mike",
+    email: "michael@topkidevents.com",
+    fyStart: "01",            // fiscal year starts in January
+    lastBackup: "",
+    homeBase: { name: "Camp site — Lord of Life Lutheran Church",
+                address: "2480 W Dublin-Granville Rd, Columbus, OH 43235",
+                lat: 40.0899, lng: -83.0665 }
+  },
+
+  /* ---------- Cultural values ---------- */
+  valueGroups: [
+    {
+      id: "vg-traits",
+      title: "The 6 Character Traits",
+      blurb: "One per day, 3–5 minutes each. This is the product and the point.",
+      items: [
+        { id:"v1", icon:"🗣️", title:"Truthfulness", text:"Say the true thing, especially when it costs you something." },
+        { id:"v2", icon:"🙋", title:"Ownership",    text:"It's mine to fix. No blaming, no waiting to be told." },
+        { id:"v3", icon:"⛰️", title:"Perseverance", text:"Keep going after it stops being fun. Many short races, not one long one." },
+        { id:"v4", icon:"💛", title:"Kindness",     text:"Notice who's left out, then do something about it." },
+        { id:"v5", icon:"🧭", title:"Integrity",    text:"Do the right thing when nobody's looking." },
+        { id:"v6", icon:"🤝", title:"Dependability",text:"When I say I'll be there, I'm there." }
+      ]
+    },
+    {
+      id: "vg-ops",
+      title: "How We Operate",
+      blurb: "The promises behind every fundraiser and every camp week.",
+      items: [
+        { id:"o1", icon:"🧒", title:"Kids First, Always", text:"Every decision gets tested against: is this better for the kid in the third row?" },
+        { id:"o2", icon:"🚫", title:"No Junk to Sell",   text:"Families donate to a story, not a catalog. Nobody buys wrapping paper." },
+        { id:"o3", icon:"🍎", title:"Teachers Supported, Not Burdened", text:"If it adds work to a teacher's plate, we redesign it." },
+        { id:"o4", icon:"📖", title:"Every Student Included", text:"No prize tiers that sort kids into winners and losers." },
+        { id:"o5", icon:"✅", title:"Show Up Prepared",  text:"Materials ready, platform live, script printed — before anyone has to ask." },
+        { id:"o6", icon:"🌱", title:"Leave It Better",   text:"The school should be stronger after we leave than the day we arrived." }
+      ]
+    }
+  ],
+
+  /* ---------- Goals & milestones ---------- */
+  goals: [
+    { id:"g1", title:"Book 12 school fundraisers for the 2026–27 school year", category:"Fundraising",
+      current:0, target:12, unit:"schools", due:"2027-05-31", status:"active",
+      detail:"Signed agreements, dates on the calendar. Counts Blueprint, TK Partner and Full Service." },
+    { id:"g2", title:"Fill Summer Camp 2027 to 80% capacity across all weeks", category:"Camp",
+      current:0, target:80, unit:"% full", due:"2027-06-01", status:"active",
+      detail:"Measured as total registrations ÷ total seats offered." },
+    { id:"g3", title:"Reach $150,000 in total revenue", category:"Company",
+      current:0, target:150000, unit:"$", due:"2027-06-30", status:"active",
+      detail:"Fundraising + Summer Camp combined." },
+    { id:"g4", title:"Convert 3 Blueprint schools up to TK Partner", category:"Fundraising",
+      current:0, target:3, unit:"upgrades", due:"2027-03-31", status:"active",
+      detail:"The clearest signal the program worked is a school buying more of it." },
+    { id:"g5", title:"Record all 6 lesson videos in studio quality", category:"Product",
+      current:0, target:6, unit:"videos", due:"2026-12-15", status:"active",
+      detail:"Partner Portal asset. Unlocks the TK Partner tier at scale." },
+    { id:"g6", title:"50 schools in the outreach pipeline", category:"Growth",
+      current:0, target:50, unit:"schools", due:"2026-12-31", status:"active",
+      detail:"Named school, named contact, at least one real touch logged." }
+  ],
+
+  milestones: [
+    { id:"m1", date:"2026-09-15", title:"Fall outreach push complete", detail:"Every target school contacted at least once before PTA budgets lock.", done:false },
+    { id:"m2", date:"2026-10-31", title:"First fall fundraiser runs", detail:"", done:false },
+    { id:"m3", date:"2026-12-15", title:"Lesson video library finished", detail:"", done:false },
+    { id:"m4", date:"2027-01-15", title:"Summer Camp 2027 registration opens", detail:"Early-bird pricing live on the site.", done:false },
+    { id:"m5", date:"2027-03-01", title:"Spring fundraiser slate locked", detail:"", done:false },
+    { id:"m6", date:"2027-06-14", title:"Camp 2027 Week 1 opens", detail:"", done:false }
+  ],
+
+  /* ---------- Metrics (edit values as you track them) ---------- */
+  metrics: [
+    { id:"k1", label:"Schools run (all time)", value:0, target:20,  unit:"", cat:"Fundraising", note:"Schools marked Active or Past client.", auto:"schoolsRun", history:[] },
+    { id:"k2", label:"Avg raised per school", value:0, target:20000, unit:"$", cat:"Fundraising", note:"Total raised ÷ fundraisers run.", history:[] },
+    { id:"k3", label:"Pipeline → booked rate", value:0, target:25, unit:"%", cat:"Growth", note:"Booked ÷ schools contacted.", auto:"winRate", history:[] },
+    { id:"k4", label:"School renewal rate", value:0, target:70, unit:"%", cat:"Fundraising", note:"Schools that run it a second year.", history:[] },
+    { id:"k5", label:"Camp weeks run", value:4, target:8, unit:"", cat:"Camp", note:"Counted from the camp weeks on the Revenue tab.", auto:"campWeeks", history:[] },
+    { id:"k6", label:"Camper returns", value:0, target:50, unit:"%", cat:"Camp", note:"Campers who come back another week or year.", history:[] },
+    { id:"k7", label:"Email list size", value:0, target:1500, unit:"", cat:"Marketing", note:"Parents + PTA contacts.", history:[] },
+    { id:"k8", label:"Outreach touches this month", value:0, target:40, unit:"", cat:"Growth", note:"Auto-counted from the outreach log below.", auto:"touchesThisMonth", history:[] }
+  ],
+
+  /* ---------- Quotes ---------- */
+  quotes: [
+    { id:"q1", text:"You've got this.", author:"Coach Mike" },
+    { id:"q2", text:"Character is doing the right thing when nobody is looking.", author:"J.C. Watts" },
+    { id:"q3", text:"Start where you are. Use what you have. Do what you can.", author:"Arthur Ashe" },
+    { id:"q4", text:"It always seems impossible until it's done.", author:"Nelson Mandela" },
+    { id:"q5", text:"Perseverance is not a long race; it is many short races.", author:"Walter Elliot" },
+    { id:"q6", text:"The way to get started is to quit talking and begin doing.", author:"Walt Disney" },
+    { id:"q7", text:"Small deeds done are better than great deeds planned.", author:"Peter Marshall" },
+    { id:"q8", text:"Whether you think you can or think you can't, you're right.", author:"Henry Ford" }
+  ],
+
+  /* ---------- Schools ----------
+     Seeded as pipeline targets around the Columbus metro.
+     Coordinates are CITY-LEVEL approximations (approx:true) so the map
+     has something to draw — open a school and set the real lat/lng, or
+     just fix the address. Statuses all start at "target"; move them as
+     you go.                                                            */
+  schools: [
+    mkSchool("Wilson Hill Elementary","Worthington City Schools","Worthington",40.0931,-83.0180),
+    mkSchool("Slate Hill Elementary","Worthington City Schools","Worthington",40.0931,-83.0180),
+    mkSchool("Liberty Elementary","Worthington City Schools","Worthington",40.0931,-83.0180),
+    mkSchool("Indian Run Elementary","Dublin City Schools","Dublin",40.0992,-83.1141),
+    mkSchool("Olde Sawmill Elementary","Dublin City Schools","Dublin",40.0992,-83.1141),
+    mkSchool("Deer Run Elementary","Dublin City Schools","Dublin",40.0992,-83.1141),
+    mkSchool("Alton Darby Elementary","Hilliard City Schools","Hilliard",40.0334,-83.1582),
+    mkSchool("Hilliard Crossing Elementary","Hilliard City Schools","Hilliard",40.0334,-83.1582),
+    mkSchool("Tyler Run Elementary","Olentangy Local Schools","Powell",40.1573,-83.0752),
+    mkSchool("Wyandot Run Elementary","Olentangy Local Schools","Powell",40.1573,-83.0752),
+    mkSchool("Wickliffe Progressive Elementary","Upper Arlington Schools","Upper Arlington",40.0248,-83.0621),
+    mkSchool("Annehurst Elementary","Westerville City Schools","Westerville",40.1262,-82.9291)
+  ],
+
+  /* ---------- Revenue & expenses (empty on purpose — add real numbers) ---------- */
+  revenue: [],
+  expenses: [],
+
+  /* ---------- Camp weeks that ran in 2026 (seats/registrations to fill in) ---------- */
+  campWeeks: [
+    { id:"c1", name:"Week 1", year:2026, start:"2026-06-15", end:"2026-06-19", capacity:0, registered:0, price:0 },
+    { id:"c2", name:"Week 2", year:2026, start:"2026-06-22", end:"2026-06-26", capacity:0, registered:0, price:0 },
+    { id:"c3", name:"Week 3", year:2026, start:"2026-07-27", end:"2026-07-31", capacity:0, registered:0, price:0 },
+    { id:"c4", name:"Week 4", year:2026, start:"2026-08-03", end:"2026-08-07", capacity:0, registered:0, price:0 }
+  ],
+
+  /* ---------- Key dates ---------- */
+  dates: [
+    { id:"d1", date:"2026-09-08", title:"Fall PTA meeting season begins", type:"Outreach", detail:"Most PTAs set the year's fundraising calendar in Sept. Be in the room or in their inbox first." },
+    { id:"d2", date:"2026-10-01", title:"Fall fundraiser window opens", type:"Fundraiser", detail:"Oct–Nov is the strongest fall slot." },
+    { id:"d3", date:"2027-01-15", title:"Camp 2027 registration opens", type:"Camp", detail:"" },
+    { id:"d4", date:"2027-03-01", title:"Spring fundraiser window opens", type:"Fundraiser", detail:"Mar–Apr slot." },
+    { id:"d5", date:"2027-06-14", title:"Summer Camp 2027 — Week 1", type:"Camp", detail:"" }
+  ],
+
+  /* ---------- To-dos ---------- */
+  todos: [
+    { id:"t1", title:"Put every to-do from the other lists into this dashboard", area:"Ops", priority:"high", status:"open", due:todayISO(), notes:"Phone notes, sticky notes, email flags, whatever else. One home from here on.", created:todayISO() },
+    { id:"t2", title:"Set real statuses on the seeded schools (target vs client)", area:"Fundraising", priority:"high", status:"open", due:"", notes:"", created:todayISO() },
+    { id:"t3", title:"Enter 2026 camp revenue and camper counts", area:"Camp", priority:"med", status:"open", due:"", notes:"Per week, from ProCare.", created:todayISO() },
+    { id:"t4", title:"Back up the dashboard (Data tab → Export JSON)", area:"Ops", priority:"low", status:"open", due:"", notes:"Do this monthly.", created:todayISO() }
+  ],
+
+  /* ---------- Wins ---------- */
+  wins: [],
+
+  /* ---------- Settings ---------- */
+  settings: { theme:"auto", lastQuote:0, demo:false,
+              github:{ owner:"", repo:"", path:"data.json", branch:"main" } }
+};
+
+function todayISO(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+
+function mkSchool(name, district, city, lat, lng){
+  mkSchool.n = (mkSchool.n || 0) + 1;
+  const _sid = mkSchool.n;
+  // tiny deterministic spread so city-level pins don't sit exactly on top of each other
+  const off = _sid * 0.0055, ang = _sid * 2.399;
+  return {
+    id: "s"+_sid, name, district, city, state:"OH", zip:"", address:"",
+    lat: +(lat + Math.cos(ang)*off).toFixed(5),
+    lng: +(lng + Math.sin(ang)*off).toFixed(5),
+    approx: true,
+    status: "target",            // target | contacted | meeting | proposal | booked | client | past | lost
+    tier: "",                    // Blueprint | TK Partner | Full Service | Camp Host
+    products: [],
+    students: 0,
+    contactName:"", contactRole:"", contactEmail:"", contactPhone:"",
+    nextAction:"", nextActionDate:"",
+    notes:"",
+    tags:[],
+    outreach:[],
+    raised:[]                    // [{year, amount, product}]
+  };
+}
+
+/* =====================================================================
+   2. STORE  — localStorage, with JSON export/import
+   ===================================================================== */
+const KEY = "topkid.dashboard.v1";
+let DB;
+
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+
+function load(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if(!raw){ DB = clone(SEED); return; }
+    const saved = JSON.parse(raw);
+    DB = Object.assign(clone(SEED), saved);        // new seed keys survive upgrades
+    DB.settings = Object.assign(clone(SEED.settings), saved.settings||{});
+    DB.meta     = Object.assign(clone(SEED.meta),     saved.meta||{});
+  }catch(e){
+    console.error("Could not read saved data, starting from seed.", e);
+    DB = clone(SEED);
+  }
+}
+let saveTimer=null;
+function save(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(()=>{
+    try{ localStorage.setItem(KEY, JSON.stringify(DB)); }
+    catch(e){ if(SYNC.mode !== "file") toast("Could not save — browser storage may be full or blocked.", "crit"); }
+    scheduleFileWrite();
+    schedulePush();
+  }, 60);
+}
+function commit(){ save(); render(); }
+
+/* =====================================================================
+   2b. FILE SYNC — write straight into a real .json file on disk
+   Uses the File System Access API. That API needs a "secure context",
+   which a double-clicked file:// page is not — so this lights up only
+   when the dashboard is opened through the launcher (localhost) or from
+   a hosted URL. When it isn't available we fall back to localStorage +
+   the backup nag, and say so plainly.
+   ===================================================================== */
+const SYNC = { mode:"local", handle:null, name:"", lastWrite:"", error:"",
+               supported: typeof window.showSaveFilePicker === "function" };
+
+/* File handles can't live in localStorage — they go in IndexedDB. */
+function idbOpen(){
+  return new Promise((res,rej)=>{
+    const r = indexedDB.open("topkid-sync",1);
+    r.onupgradeneeded = ()=> r.result.createObjectStore("kv");
+    r.onsuccess = ()=> res(r.result);
+    r.onerror   = ()=> rej(r.error);
+  });
+}
+async function idbGet(k){
+  try{ const db = await idbOpen();
+    return await new Promise((res,rej)=>{ const q = db.transaction("kv").objectStore("kv").get(k);
+      q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); });
+  }catch(e){ return null; }
+}
+async function idbSet(k,v){
+  try{ const db = await idbOpen();
+    await new Promise((res,rej)=>{ const q = db.transaction("kv","readwrite").objectStore("kv").put(v,k);
+      q.onsuccess=()=>res(); q.onerror=()=>rej(q.error); });
+  }catch(e){}
+}
+async function idbDel(k){
+  try{ const db = await idbOpen();
+    await new Promise((res,rej)=>{ const q = db.transaction("kv","readwrite").objectStore("kv").delete(k);
+      q.onsuccess=()=>res(); q.onerror=()=>rej(q.error); });
+  }catch(e){}
+}
+
+const FILE_TYPES = [{ description:"TopKid dashboard data", accept:{"application/json":[".json"]} }];
+
+/* =====================================================================
+   2c. GITHUB SYNC — the private repo is the shared source of truth
+   Every save becomes a commit, so any past state can be restored, and
+   the Mac / phone / iPad all read the same file.
+
+   SECURITY: the access token is deliberately kept OUT of DB, so it can
+   never end up inside data.json and get committed to the repo. It lives
+   in its own localStorage key, per device, and is stripped defensively
+   before every push.
+   ===================================================================== */
+const TOKEN_KEY = "topkid.gh.token";
+const GH = { mode:"off", sha:"", last:"", error:"", busy:false, pending:false };
+
+function ghCfg(){ return DB.settings.github || (DB.settings.github = {owner:"",repo:"",path:"data.json",branch:"main"}); }
+function ghToken(){ try{ return localStorage.getItem(TOKEN_KEY) || ""; }catch(e){ return ""; } }
+function ghSetToken(t){ try{ t ? localStorage.setItem(TOKEN_KEY,t) : localStorage.removeItem(TOKEN_KEY); }catch(e){} }
+function ghConfigured(){ const c = ghCfg(); return !!(c.owner && c.repo && c.path && ghToken()); }
+
+/* GitHub wants base64 of UTF-8; chunked so big files don't blow the stack. */
+function b64encode(str){
+  const bytes = new TextEncoder().encode(str);
+  let bin = "", CH = 0x8000;
+  for(let i=0;i<bytes.length;i+=CH) bin += String.fromCharCode.apply(null, bytes.subarray(i, i+CH));
+  return btoa(bin);
+}
+function b64decode(b64){
+  const bin = atob(String(b64).replace(/\s/g,""));
+  const bytes = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+
+async function ghApi(path, opts={}){
+  const r = await fetch("https://api.github.com" + path, Object.assign({}, opts, {
+    headers: Object.assign({
+      "Accept":"application/vnd.github+json",
+      "Authorization":"Bearer " + ghToken(),
+      "X-GitHub-Api-Version":"2022-11-28"
+    }, opts.headers||{})
+  }));
+  if(r.status === 404) return { __missing:true, status:404 };
+  if(!r.ok){
+    let detail = "";
+    try{ detail = (await r.json()).message || ""; }catch(e){}
+    const err = new Error(ghErrorText(r.status, detail));
+    err.status = r.status;
+    throw err;
+  }
+  return r.json();
+}
+function ghErrorText(status, msg){
+  if(status === 401) return "Token rejected — it may be expired or mistyped.";
+  if(status === 403) return "Token lacks permission for this repo (needs Contents: Read and write).";
+  if(status === 409 || status === 422) return "Someone else changed the file first.";
+  if(status === 404) return "Repo or file path not found — check the owner/repo names.";
+  return "GitHub error " + status + (msg ? ": " + msg : "");
+}
+
+function ghPayload(){
+  const copy = clone(DB);
+  if(copy.settings) delete copy.settings.token;   // belt and braces: never ship a token
+  copy.meta = copy.meta || {};
+  copy.meta.updatedAt = new Date().toISOString();
+  copy.meta.updatedBy = deviceName();
+  DB.meta.updatedAt = copy.meta.updatedAt;
+  return copy;
+}
+function deviceName(){
+  const ua = navigator.userAgent;
+  if(/iPhone/.test(ua)) return "iPhone";
+  if(/iPad/.test(ua)) return "iPad";
+  if(/Android/.test(ua)) return "Android";
+  if(/Mac/.test(ua)) return "Mac";
+  return "Browser";
+}
+
+/* ---------- pull ---------- */
+async function ghPull(ref){
+  const c = ghCfg();
+  const q = "?ref=" + encodeURIComponent(ref || c.branch || "main");
+  const j = await ghApi(`/repos/${c.owner}/${c.repo}/contents/${encodeURIComponent(c.path)}` + q);
+  if(j.__missing) return null;
+  if(!ref) GH.sha = j.sha;
+  const d = JSON.parse(b64decode(j.content));
+  if(!d || typeof d !== "object" || !("schools" in d)) throw new Error("That file isn't dashboard data.");
+  return d;
+}
+
+/* ---------- push ---------- */
+async function ghPush(message){
+  const c = ghCfg();
+  const body = {
+    message: message || ("Dashboard update from " + deviceName() + " · " + new Date().toLocaleString("en-US")),
+    content: b64encode(JSON.stringify(ghPayload(), null, 2)),
+    branch: c.branch || "main"
+  };
+  if(GH.sha) body.sha = GH.sha;
+  const j = await ghApi(`/repos/${c.owner}/${c.repo}/contents/${encodeURIComponent(c.path)}`,
+                        { method:"PUT", body: JSON.stringify(body) });
+  GH.sha = j.content.sha;
+  GH.last = new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"});
+  return j;
+}
+
+function adopt(d){
+  DB = Object.assign(clone(SEED), d);
+  DB.settings = Object.assign(clone(SEED.settings), d.settings||{});
+  DB.meta     = Object.assign(clone(SEED.meta),     d.meta||{});
+}
+
+/* ---------- boot / manual sync ---------- */
+async function ghSync(opts={}){
+  if(!ghConfigured()){ GH.mode = "off"; return; }
+  if(GH.busy){ GH.pending = true; return; }
+  GH.busy = true; GH.mode = "syncing"; GH.error = ""; renderSidebar();
+  try{
+    const remote = await ghPull();
+    if(!remote){                                   // first ever push
+      await ghPush("Create dashboard data");
+      GH.mode = "ready";
+    } else {
+      const rT = remote.meta && remote.meta.updatedAt || "";
+      const lT = DB.meta.updatedAt || "";
+      if(opts.force === "local"){ await ghPush("Overwrite from " + deviceName()); GH.mode = "ready"; }
+      else if(opts.force === "remote"){ adopt(remote); saveLocalOnly(); GH.mode = "ready"; }
+      else if(rT && lT && rT > lT && opts.dirty){   // both changed — real conflict
+        GH.mode = "conflict"; GH.busy = false;
+        renderSidebar(); showConflict(remote); return;
+      }
+      else if(rT > lT){ adopt(remote); saveLocalOnly(); GH.mode = "ready"; }
+      else if(lT > rT){ await ghPush(); GH.mode = "ready"; }
+      else GH.mode = "ready";
+    }
+    GH.last = GH.last || new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"});
+  }catch(e){
+    GH.mode = "error"; GH.error = e.message;
+  }
+  GH.busy = false;
+  render();
+  if(GH.pending){ GH.pending = false; schedulePush(); }
+}
+
+function saveLocalOnly(){
+  try{ localStorage.setItem(KEY, JSON.stringify(DB)); }catch(e){}
+}
+
+let ghTimer = null;
+function schedulePush(){
+  if(!ghConfigured()) return;
+  clearTimeout(ghTimer);
+  GH.mode = GH.mode === "error" ? "error" : "pending";
+  renderSidebar();
+  ghTimer = setTimeout(async ()=>{
+    if(GH.busy){ GH.pending = true; return; }
+    GH.busy = true; GH.mode = "syncing"; GH.error = ""; renderSidebar();
+    try{ await ghPush(); GH.mode = "ready"; }
+    catch(e){
+      if(e.status === 409 || e.status === 422){    // remote moved under us
+        GH.busy = false;
+        try{ const remote = await ghPull(); GH.mode = "conflict"; renderSidebar(); showConflict(remote); return; }
+        catch(e2){ GH.mode = "error"; GH.error = e2.message; }
+      } else { GH.mode = "error"; GH.error = e.message; }
+    }
+    GH.busy = false; renderSidebar();
+    if(GH.pending){ GH.pending = false; schedulePush(); }
+  }, 3500);
+}
+
+/* ---------- conflict ---------- */
+let _conflictRemote = null;
+function showConflict(remote){
+  _conflictRemote = remote;
+  const rM = remote.meta||{}, lM = DB.meta||{};
+  const count = d => `${(d.schools||[]).length} schools · ${(d.todos||[]).length} to-dos · ${(d.revenue||[]).length} revenue rows`;
+  openOverlay(`
+    <div class="modal-back" data-act="backdrop">
+      <div class="modal" style="max-width:600px">
+        <header><h3>This was edited somewhere else</h3></header>
+        <div class="body">
+          <p style="margin:0">Both this device and another one changed the dashboard. Nothing is lost either way —
+             whichever you don't pick stays in the repo's history and can be restored.</p>
+          <div class="grid g2" style="gap:12px">
+            <div class="card" style="box-shadow:none">
+              <div class="tag brand">This device</div>
+              <div class="small muted" style="margin-top:8px">Changed ${h(lM.updatedAt ? new Date(lM.updatedAt).toLocaleString("en-US") : "unknown")}</div>
+              <div class="small" style="margin-top:6px">${h(count(DB))}</div>
+            </div>
+            <div class="card" style="box-shadow:none">
+              <div class="tag info">${h(rM.updatedBy || "Other device")}</div>
+              <div class="small muted" style="margin-top:8px">Changed ${h(rM.updatedAt ? new Date(rM.updatedAt).toLocaleString("en-US") : "unknown")}</div>
+              <div class="small" style="margin-top:6px">${h(count(remote))}</div>
+            </div>
+          </div>
+        </div>
+        <footer>
+          <button class="btn" data-act="conflict-download" style="margin-right:auto">Download both</button>
+          <button class="btn" data-act="conflict-remote">Use the other device's</button>
+          <button class="btn primary" data-act="conflict-local">Keep this device's</button>
+        </footer>
+      </div>
+    </div>`);
+}
+
+/* ---------- version history ---------- */
+async function ghHistory(){
+  const c = ghCfg();
+  return ghApi(`/repos/${c.owner}/${c.repo}/commits?path=${encodeURIComponent(c.path)}&sha=${encodeURIComponent(c.branch||"main")}&per_page=30`);
+}
+
+async function syncConnectNew(){
+  if(!SYNC.supported) return toast("Open the dashboard through the launcher to use this.","crit");
+  try{
+    const handle = await window.showSaveFilePicker({ suggestedName:"TopKid-Data.json", types:FILE_TYPES });
+    SYNC.handle = handle; SYNC.name = handle.name; SYNC.mode = "file"; SYNC.error = "";
+    await idbSet("handle", handle);
+    await writeDataFile();
+    DB.meta.lastBackup = todayISO();
+    commit();
+    toast("Connected. Every change now writes to " + handle.name + ".");
+  }catch(e){ if(e.name !== "AbortError"){ SYNC.error = e.message; toast("Couldn't connect that file.","crit"); } }
+}
+
+async function syncOpenExisting(){
+  if(!SYNC.supported) return toast("Open the dashboard through the launcher to use this.","crit");
+  try{
+    const [handle] = await window.showOpenFilePicker({ types:FILE_TYPES, multiple:false });
+    if(await handle.requestPermission({mode:"readwrite"}) !== "granted")
+      return toast("Write permission is needed to keep the file in sync.","crit");
+    const txt = await (await handle.getFile()).text();
+    const d = JSON.parse(txt);
+    if(!d || typeof d !== "object" || !("schools" in d)) throw new Error("not a dashboard file");
+    DB = Object.assign(clone(SEED), d);
+    DB.settings = Object.assign(clone(SEED.settings), d.settings||{});
+    DB.meta     = Object.assign(clone(SEED.meta),     d.meta||{});
+    SYNC.handle = handle; SYNC.name = handle.name; SYNC.mode = "file"; SYNC.error = "";
+    await idbSet("handle", handle);
+    commit();
+    toast("Loaded " + handle.name + " — now kept in sync.");
+  }catch(e){ if(e.name !== "AbortError") toast("That file isn't a dashboard data file.","crit"); }
+}
+
+async function syncReconnect(){
+  if(!SYNC.handle) return;
+  try{
+    if(await SYNC.handle.requestPermission({mode:"readwrite"}) === "granted"){
+      SYNC.mode = "file"; await restoreFromFile(); toast("Reconnected to " + SYNC.name + ".");
+    }
+  }catch(e){ SYNC.error = e.message; renderSidebar(); }
+}
+
+async function syncDisconnect(){
+  await idbDel("handle");
+  SYNC.handle = null; SYNC.name = ""; SYNC.mode = "local"; SYNC.lastWrite = "";
+  commit(); toast("Disconnected. Back to browser-only storage.");
+}
+
+let fileTimer = null;
+function scheduleFileWrite(){
+  if(SYNC.mode !== "file" || !SYNC.handle) return;
+  clearTimeout(fileTimer);
+  fileTimer = setTimeout(writeDataFile, 900);
+}
+async function writeDataFile(){
+  if(!SYNC.handle) return;
+  try{
+    const w = await SYNC.handle.createWritable();
+    await w.write(JSON.stringify(DB,null,2));
+    await w.close();
+    SYNC.lastWrite = new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"});
+    SYNC.error = "";
+  }catch(e){
+    SYNC.error = e.message;
+    if(e.name === "NotAllowedError") SYNC.mode = "needs-permission";
+  }
+  renderSidebar();
+}
+
+/* On boot: if a file was connected before, the FILE is the source of truth. */
+async function restoreFromFile(){
+  if(!SYNC.supported) return;
+  const handle = await idbGet("handle");
+  if(!handle) return;
+  SYNC.handle = handle; SYNC.name = handle.name;
+  let perm = "prompt";
+  try{ perm = await handle.queryPermission({mode:"readwrite"}); }catch(e){}
+  if(perm !== "granted"){ SYNC.mode = "needs-permission"; renderSidebar(); return; }
+  try{
+    const txt = await (await handle.getFile()).text();
+    if(txt.trim()){
+      const d = JSON.parse(txt);
+      if(d && typeof d === "object" && "schools" in d){
+        DB = Object.assign(clone(SEED), d);
+        DB.settings = Object.assign(clone(SEED.settings), d.settings||{});
+        DB.meta     = Object.assign(clone(SEED.meta),     d.meta||{});
+      }
+    }
+    SYNC.mode = "file"; SYNC.error = "";
+  }catch(e){ SYNC.error = e.message; }
+  render();
+}
+
+/* =====================================================================
+   3. UTILITIES
+   ===================================================================== */
+const $  = (s,r=document)=>r.querySelector(s);
+const $$ = (s,r=document)=>Array.from(r.querySelectorAll(s));
+function uid(p){ return p + "-" + Math.random().toString(36).slice(2,9); }
+function h(s){ return String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function money(n, cents=false){
+  n = Number(n)||0;
+  return "$" + n.toLocaleString("en-US",{minimumFractionDigits:cents?2:0, maximumFractionDigits:cents?2:0});
+}
+function moneyShort(n){
+  n = Number(n)||0;
+  if(Math.abs(n) >= 1000000) return "$" + (n/1000000).toFixed(1).replace(/\.0$/,"") + "M";
+  if(Math.abs(n) >= 1000)    return "$" + (n/1000).toFixed(1).replace(/\.0$/,"") + "k";
+  return "$" + Math.round(n);
+}
+function fmtMetric(v,u){
+  if(u === "$") return money(v);
+  if(u === "%" || u === "% full") return (Math.round(v*10)/10) + "%";
+  return (Number(v)||0).toLocaleString("en-US") + (u ? " " + u : "");
+}
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function parseISO(s){ if(!s) return null; const p=String(s).split("-").map(Number); return new Date(p[0], (p[1]||1)-1, p[2]||1); }
+function fmtDate(s,long){
+  const d = parseISO(s); if(!d || isNaN(d)) return "";
+  return long ? d.toLocaleDateString("en-US",{weekday:"short",month:"long",day:"numeric",year:"numeric"})
+              : MONTHS[d.getMonth()] + " " + d.getDate() + ", " + d.getFullYear();
+}
+function fmtDateShort(s){ const d=parseISO(s); return d&&!isNaN(d) ? MONTHS[d.getMonth()]+" "+d.getDate() : ""; }
+function today0(){ const d=new Date(); d.setHours(0,0,0,0); return d; }
+function daysUntil(s){ const d=parseISO(s); if(!d||isNaN(d)) return null; return Math.round((d-today0())/86400000); }
+function relDays(s){
+  const n = daysUntil(s); if(n===null) return "";
+  if(n === 0)  return "today";
+  if(n === 1)  return "tomorrow";
+  if(n === -1) return "yesterday";
+  if(n < 0)    return Math.abs(n) + " days ago";
+  if(n < 45)   return "in " + n + " days";
+  return "in " + Math.round(n/30) + " months";
+}
+function ym(s){ return String(s||"").slice(0,7); }
+function sortBy(arr, fn){ return arr.slice().sort((a,b)=>{ const x=fn(a), y=fn(b); return x<y?-1:x>y?1:0; }); }
+function sum(arr, fn){ return arr.reduce((t,x)=> t + (Number(fn?fn(x):x)||0), 0); }
+
+function toast(msg, kind){
+  let t = $("#toast");
+  if(!t){ t = document.createElement("div"); t.id="toast"; document.body.appendChild(t); }
+  t.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom:26px;z-index:1000;"+
+    "background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:11px;font-size:13.5px;box-shadow:var(--shadow-lg)";
+  if(kind==="crit") t.style.background = "#b02222", t.style.color="#fff";
+  t.textContent = msg;
+  clearTimeout(t._t); t._t = setTimeout(()=>t.remove(), 2600);
+}
+
+/* ---------- Domain helpers ---------- */
+const STATUSES = [
+  { k:"target",    label:"Target",     tone:"neutral", pin:"#6b6b78", pipeline:true },
+  { k:"contacted", label:"Contacted",  tone:"info",    pin:"#2a5fb0", pipeline:true },
+  { k:"meeting",   label:"Meeting Set",tone:"info",    pin:"#2a5fb0", pipeline:true },
+  { k:"proposal",  label:"Proposal Out",tone:"warn",   pin:"#8a5a00", pipeline:true },
+  { k:"booked",    label:"Booked",     tone:"brand",   pin:"#c727d5", pipeline:true },
+  { k:"client",    label:"Active Client",tone:"good",  pin:"#12a150", pipeline:false },
+  { k:"past",      label:"Past Client",tone:"neutral", pin:"#12784a", pipeline:false },
+  { k:"lost",      label:"Passed / Lost",tone:"crit",  pin:"#b02222", pipeline:false }
+];
+const statusMeta = k => STATUSES.find(s=>s.k===k) || STATUSES[0];
+const TIERS   = ["","Blueprint","TK Partner","Full Service","Camp Host"];
+const PRODUCTS= ["Fundraising","Summer Camp"];
+const AREAS   = ["Fundraising","Camp","Marketing","Ops","Finance","Personal"];
+const PRIOS   = [ {k:"high",label:"High",tone:"crit"}, {k:"med",label:"Medium",tone:"warn"}, {k:"low",label:"Low",tone:"neutral"} ];
+const TOUCH   = ["Email","Call","Text","Meeting","School Visit","Proposal Sent","Event","Referral","Note"];
+const DATE_TYPES = ["Fundraiser","Camp","Outreach","Meeting","Deadline","Personal","Marketing"];
+
+const school = id => DB.schools.find(s=>s.id===id);
+function schoolRevenue(id){ return sum(DB.revenue.filter(r=>r.schoolId===id), r=>r.amount); }
+function allTouches(){
+  const out=[];
+  DB.schools.forEach(s=> (s.outreach||[]).forEach(o=> out.push(Object.assign({schoolId:s.id, schoolName:s.name}, o))));
+  return sortBy(out, o=>o.date).reverse();
+}
+function touchesThisMonth(){
+  const m = todayISO().slice(0,7);
+  return allTouches().filter(o=> ym(o.date)===m).length;
+}
+function openTodos(){ return DB.todos.filter(t=>t.status!=="done"); }
+function overdueTodos(){ return openTodos().filter(t=> t.due && daysUntil(t.due) < 0); }
+function overdueFollowups(){
+  return DB.schools.filter(s=> s.nextAction && s.nextActionDate && daysUntil(s.nextActionDate) < 0);
+}
+function revenueByProduct(year){
+  const o = {};
+  PRODUCTS.forEach(p=>o[p]=0);
+  DB.revenue.forEach(r=>{
+    if(year && String(r.date).slice(0,4) !== String(year)) return;
+    if(o[r.product]==null) o[r.product]=0;
+    o[r.product] += Number(r.amount)||0;
+  });
+  return o;
+}
+function years(){
+  const ys = new Set(DB.revenue.map(r=>String(r.date).slice(0,4)).filter(Boolean));
+  ys.add(String(new Date().getFullYear()));
+  return Array.from(ys).sort().reverse();
+}
+
+/* =====================================================================
+   4. MODAL + FORM ENGINE
+   ===================================================================== */
+function closeOverlay(){ $("#overlay").innerHTML = ""; document.body.style.overflow=""; }
+function openOverlay(html){
+  $("#overlay").innerHTML = html;
+  document.body.style.overflow = "hidden";
+}
+document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeOverlay(); });
+
+function fieldHTML(f, v){
+  const val = v==null ? "" : v;
+  let input;
+  switch(f.type){
+    case "textarea": input = `<textarea name="${f.key}" placeholder="${h(f.placeholder||"")}">${h(val)}</textarea>`; break;
+    case "select":
+      input = `<select name="${f.key}">` + f.options.map(o=>{
+        const ov = typeof o==="string" ? o : o.value, ol = typeof o==="string" ? (o||"—") : o.label;
+        return `<option value="${h(ov)}"${String(ov)===String(val)?" selected":""}>${h(ol)}</option>`;
+      }).join("") + `</select>`; break;
+    case "checks":
+      input = `<div class="checkrow">` + f.options.map(o=>
+        `<label><input type="checkbox" name="${f.key}" value="${h(o)}"${(Array.isArray(val)&&val.includes(o))?" checked":""}> ${h(o)}</label>`).join("") + `</div>`; break;
+    case "number": input = `<input type="number" name="${f.key}" value="${h(val)}" step="${f.step||"any"}" placeholder="${h(f.placeholder||"")}">`; break;
+    case "date":   input = `<input type="date" name="${f.key}" value="${h(val)}">`; break;
+    case "month":  input = `<input type="month" name="${f.key}" value="${h(String(val).slice(0,7))}">`; break;
+    default:       input = `<input type="${f.type||"text"}" name="${f.key}" value="${h(val)}" placeholder="${h(f.placeholder||"")}">`;
+  }
+  return `<div class="field"><label for="${f.key}">${h(f.label)}</label>${input}${f.help?`<div class="help">${h(f.help)}</div>`:""}</div>`;
+}
+
+let _formSave = null;
+function formModal(opts){
+  const {title, fields, values={}, saveLabel="Save", deleteFn=null, note=""} = opts;
+  _formSave = (data)=>{ opts.onSave(data); };
+  const rows = fields.map(f=>{
+    if(f.type === "row") return `<div class="field row2">${f.fields.map(sf=>fieldHTML(sf, values[sf.key])).join("")}</div>`;
+    return fieldHTML(f, values[f.key]);
+  }).join("");
+  openOverlay(`
+    <div class="modal-back" data-act="backdrop">
+      <form class="modal" id="theform" autocomplete="off">
+        <header><h3>${h(title)}</h3><button type="button" class="btn ghost sm" data-act="close">Close</button></header>
+        <div class="body">${note?`<div class="banner info" style="margin:0">${h(note)}</div>`:""}${rows}</div>
+        <footer>
+          ${deleteFn?`<button type="button" class="btn danger" data-act="form-delete" style="margin-right:auto">Delete</button>`:""}
+          <button type="button" class="btn" data-act="close">Cancel</button>
+          <button type="submit" class="btn primary">${h(saveLabel)}</button>
+        </footer>
+      </form>
+    </div>`);
+  _formDelete = deleteFn;
+  const first = $("#theform input,#theform select,#theform textarea");
+  if(first) first.focus();
+  $("#theform").addEventListener("submit", e=>{
+    e.preventDefault();
+    const fd = new FormData(e.target), data = {};
+    fields.flatMap(f=> f.type==="row" ? f.fields : [f]).forEach(f=>{
+      if(f.type==="checks") data[f.key] = fd.getAll(f.key);
+      else if(f.type==="number"){ const raw=fd.get(f.key); data[f.key] = raw==="" ? 0 : Number(raw); }
+      else data[f.key] = (fd.get(f.key)||"").toString().trim();
+    });
+    closeOverlay();
+    _formSave(data);
+  });
+}
+let _formDelete = null;
+
+function confirmModal(title, msg, onYes, yesLabel="Delete"){
+  _confirmYes = onYes;
+  openOverlay(`
+    <div class="modal-back" data-act="backdrop">
+      <div class="modal" style="max-width:460px">
+        <header><h3>${h(title)}</h3></header>
+        <div class="body"><p style="margin:0">${h(msg)}</p></div>
+        <footer>
+          <button class="btn" data-act="close">Cancel</button>
+          <button class="btn danger" data-act="confirm-yes">${h(yesLabel)}</button>
+        </footer>
+      </div>
+    </div>`);
+}
+let _confirmYes = null;
+
+/* =====================================================================
+   5. CHARTS  (hand-rolled SVG — no chart library, works offline)
+   Palette: series-1 purple / series-2 green. Validated for colour-vision
+   deficiency and contrast in both light and dark mode. Every chart also
+   ships a legend + a table view, so identity is never colour alone.
+   ===================================================================== */
+function niceMax(v){
+  if(v <= 0) return 10;
+  const mag = Math.pow(10, Math.floor(Math.log10(v)));
+  const n = v / mag;
+  const step = n<=1?1 : n<=2?2 : n<=2.5?2.5 : n<=5?5 : 10;
+  return step * mag;
+}
+function tip(obj){ return `data-tip='${h(JSON.stringify(obj))}'`; }
+
+/* Grouped vertical bars. series = [{name, color, values:[]}] */
+function groupedBars(categories, series, opts={}){
+  const W = opts.width||760, H = opts.height||260;
+  const padL = 52, padR = 12, padT = 18, padB = 30;
+  const iw = W-padL-padR, ih = H-padT-padB;
+  const maxV = niceMax(Math.max(1, ...series.flatMap(s=>s.values)));
+  const n = Math.max(1, categories.length);
+  const groupW = iw / n;
+  const inner = Math.min(groupW - 10, 64);
+  const gap = 2;
+  const barW = Math.max(3, (inner - gap*(series.length-1)) / series.length);
+  const y = v => padT + ih - (v/maxV)*ih;
+  const ticks = [0, .25, .5, .75, 1].map(f=>f*maxV);
+  const fmt = opts.fmt || moneyShort;
+
+  let g = "";
+  ticks.forEach(t=>{
+    g += `<line x1="${padL}" x2="${W-padR}" y1="${y(t).toFixed(1)}" y2="${y(t).toFixed(1)}" stroke="var(--grid)" stroke-width="1"/>`;
+    g += `<text x="${padL-8}" y="${(y(t)+4).toFixed(1)}" text-anchor="end" font-size="10.5" fill="var(--muted)">${t===0?"0":fmt(t)}</text>`;
+  });
+  categories.forEach((c,i)=>{
+    const cx = padL + groupW*i + groupW/2;
+    g += `<text x="${cx.toFixed(1)}" y="${H-10}" text-anchor="middle" font-size="10.5" fill="var(--muted)">${h(c)}</text>`;
+    series.forEach((s,si)=>{
+      const v = s.values[i]||0;
+      const bx = cx - inner/2 + si*(barW+gap);
+      const bh = Math.max(v>0?2:0, padT+ih - y(v));
+      if(bh>0) g += `<rect x="${bx.toFixed(1)}" y="${y(v).toFixed(1)}" width="${barW.toFixed(1)}" height="${bh.toFixed(1)}" rx="4" fill="${s.color}" ${tip({t:c, rows:[[s.name, fmt(v)]]})} style="cursor:default"/>`;
+    });
+    if(categories.length <= 8){
+      const tot = sum(series, s=>s.values[i]||0);
+      if(tot>0) g += `<text x="${cx.toFixed(1)}" y="${(y(tot)-6).toFixed(1)}" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--ink-2)">${fmt(tot)}</text>`;
+    }
+  });
+  g += `<line x1="${padL}" x2="${W-padR}" y1="${padT+ih}" y2="${padT+ih}" stroke="var(--rule-strong)" stroke-width="1"/>`;
+  return `<div class="chartwrap"><svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:${Math.max(320, n*46)}px;height:auto;font-family:'DM Sans',sans-serif" role="img" aria-label="${h(opts.aria||"Bar chart")}">${g}</svg></div>`;
+}
+
+/* One horizontal 100% bar: share of total by product. 2px surface gaps. */
+function shareBar(parts, opts={}){
+  const total = sum(parts, p=>p.value);
+  if(total <= 0) return `<div class="empty small">No revenue recorded yet.</div>`;
+  const W = 760, H = 46, gap = 2;
+  let x = 0, g = "";
+  parts.forEach((p,i)=>{
+    const w = (p.value/total)*W - (i<parts.length-1 ? gap : 0);
+    if(w > 0.5){
+      g += `<rect x="${x.toFixed(1)}" y="0" width="${w.toFixed(1)}" height="${H}" rx="4" fill="${p.color}" ${tip({t:p.name, rows:[[money(p.value), Math.round(p.value/total*100)+"%"]]})}/>`;
+      if(w > 92) g += `<text x="${(x+10).toFixed(1)}" y="27" font-size="13" font-weight="700" fill="#fff">${Math.round(p.value/total*100)}%</text>`;
+    }
+    x += (p.value/total)*W;
+  });
+  return `<div class="chartwrap"><svg viewBox="0 0 ${W} ${H}" style="width:100%;height:46px" role="img" aria-label="Share of revenue by product">${g}</svg></div>`;
+}
+
+function sparkline(values, color){
+  if(!values || values.length < 2) return `<div class="sparkwrap small muted" style="display:flex;align-items:center">No history yet</div>`;
+  const W=170,H=34,p=5;
+  const mn=Math.min(...values), mx=Math.max(...values), rng=(mx-mn)||1;
+  const pts = values.map((v,i)=>[ p + i*(W-2*p)/(values.length-1), H-p - ((v-mn)/rng)*(H-2*p) ]);
+  const d = pts.map((q,i)=>(i?"L":"M")+q[0].toFixed(1)+" "+q[1].toFixed(1)).join(" ");
+  const last = pts[pts.length-1];
+  return `<div class="sparkwrap"><svg viewBox="0 0 ${W} ${H}" style="width:100%;height:34px">
+    <path d="${d}" fill="none" stroke="${color||"var(--series-1)"}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="4" fill="${color||"var(--series-1)"}" stroke="var(--surface)" stroke-width="2"/>
+  </svg></div>`;
+}
+
+function legendHTML(series){
+  return `<div class="legend">` + series.map(s=>`<span><i style="background:${s.color}"></i>${h(s.name)}</span>`).join("") + `</div>`;
+}
+
+/* Chart tooltip (single floating node) */
+(function(){
+  let node=null;
+  document.addEventListener("mouseover", e=>{
+    const t = e.target.closest("[data-tip]"); if(!t) return;
+    let d; try{ d = JSON.parse(t.getAttribute("data-tip")); }catch(_){ return; }
+    node = document.createElement("div"); node.className="tip";
+    node.innerHTML = `<b>${h(d.t)}</b>` + (d.rows||[]).map(r=>`<div class="r"><span>${h(r[0])}</span><span>${h(r[1])}</span></div>`).join("");
+    document.body.appendChild(node);
+    move(e);
+  });
+  document.addEventListener("mousemove", e=>{ if(node) move(e); });
+  document.addEventListener("mouseout", e=>{ if(e.target.closest("[data-tip]") && node){ node.remove(); node=null; } });
+  function move(e){
+    const r = node.getBoundingClientRect();
+    let x = e.clientX + 14, y = e.clientY - r.height - 10;
+    if(x + r.width > innerWidth - 8) x = e.clientX - r.width - 14;
+    if(y < 8) y = e.clientY + 18;
+    node.style.left = x+"px"; node.style.top = y+"px";
+  }
+})();
+
+/* =====================================================================
+   6. ROUTER + SIDEBAR
+   ===================================================================== */
+const VIEWS = [
+  { k:"overview", label:"Overview",     ic:"◆", sec:"Today" },
+  { k:"todos",    label:"To-Dos",       ic:"✓", sec:"Today" },
+  { k:"calendar", label:"Key Dates",    ic:"▤", sec:"Today" },
+  { k:"schools",  label:"Schools & Map",ic:"◉", sec:"Growth" },
+  { k:"pipeline", label:"Pipeline",     ic:"⇉", sec:"Growth" },
+  { k:"revenue",  label:"Revenue",      ic:"$", sec:"Money" },
+  { k:"metrics",  label:"Metrics",      ic:"▲", sec:"Money" },
+  { k:"goals",    label:"Goals",        ic:"◎", sec:"Direction" },
+  { k:"culture",  label:"Cultural Values", ic:"♥", sec:"Direction" },
+  { k:"quotes",   label:"Quotes",       ic:"❝", sec:"Direction" },
+  { k:"data",     label:"Data & Backup",ic:"⚙", sec:"Direction" }
+];
+const UI = { view:"overview", schoolFilter:"all", schoolQuery:"", todoFilter:"open", todoArea:"all",
+             selected:null, revYear:String(new Date().getFullYear()), showTable:{} };
+
+function renderSidebar(){
+  const od = overdueTodos().length, open = openTodos().length, fu = overdueFollowups().length;
+  let html = `<div class="brand"><span class="wordmark logo"><span class="t">Top</span><span class="k">Kid</span></span>
+      <span class="sub">Dashboard</span></div><div class="navlist">`;
+  let sec = "";
+  VIEWS.forEach(v=>{
+    if(v.sec !== sec){ sec = v.sec; html += `<div class="navsec">${h(sec)}</div>`; }
+    let badge = "";
+    if(v.k==="todos" && open)   badge = `<span class="badge${od?"":" q"}">${od?od+" late":open}</span>`;
+    if(v.k==="schools" && fu)   badge = `<span class="badge">${fu}</span>`;
+    html += `<button class="navbtn" data-act="go" data-view="${v.k}" aria-current="${UI.view===v.k}">
+      <span class="ic" aria-hidden="true">${v.ic}</span>${h(v.label)}${badge}</button>`;
+  });
+  html += `</div><div class="sidefoot">
+      <div>${h(DB.meta.owner)} · ${h(DB.meta.business)}</div>
+      <div style="margin-top:8px;display:flex;gap:6px">
+        <button class="btn sm ghost" data-act="theme">◐ Theme</button>
+        <button class="btn sm ghost" data-act="print">⎙ Print</button>
+      </div>
+      <div style="margin-top:9px;font-size:11px">${syncStatusHTML()}</div>
+    </div>`;
+  $("#sidebar").innerHTML = html;
+}
+
+function ghStatusHTML(){
+  if(!ghConfigured()) return "";
+  const c = ghCfg();
+  const dot = { ready:["var(--good)","● Synced"], syncing:["var(--info)","↻ Syncing…"],
+                pending:["var(--muted)","○ Saving…"], conflict:["var(--warn)","⚠ Conflict"],
+                error:["var(--crit)","⚠ Sync error"], off:["var(--muted)","○ Off"] }[GH.mode] || ["var(--muted)","○"];
+  return `<div style="margin-bottom:7px">
+    <span style="color:${dot[0]}">${dot[1]}</span>${GH.mode==="ready"&&GH.last?` · ${h(GH.last)}`:""}
+    <br><span class="muted">${h(c.owner)}/${h(c.repo)}</span>
+    ${GH.error?`<br><span style="color:var(--crit)">${h(GH.error)}</span>`:""}
+    ${GH.mode==="conflict"?`<br><button class="btn sm" data-act="gh-sync" style="width:100%;margin-top:5px">Resolve</button>`:""}
+  </div>`;
+}
+function syncStatusHTML(){
+  const gh = ghStatusHTML();
+  if(gh && SYNC.mode !== "file") return gh;
+  if(SYNC.mode === "file") return gh +
+      `<span style="color:var(--good)">● Saving to ${h(SYNC.name)}</span>${SYNC.lastWrite?`<br>last write ${h(SYNC.lastWrite)}`:""}`
+      + (SYNC.error?`<br><span style="color:var(--crit)">${h(SYNC.error)}</span>`:"");
+  if(SYNC.mode === "needs-permission")
+    return `<button class="btn sm" data-act="sync-reconnect" style="width:100%">Reconnect ${h(SYNC.name)}</button>`;
+  if(SYNC.supported)
+    return `<button class="btn sm" data-act="sync-connect" style="width:100%">Save to a file…</button>`;
+  return backupStale()
+    ? `<button class="btn sm danger" data-act="export-json" style="width:100%">⚠ Back up now</button>`
+    : `Backed up ${h(fmtDateShort(DB.meta.lastBackup))} · ${backupAgeDays()} days ago`;
+}
+
+function render(){
+  renderSidebar();
+  const fn = ({
+    overview:viewOverview, todos:viewTodos, calendar:viewCalendar, schools:viewSchools,
+    pipeline:viewPipeline, revenue:viewRevenue, metrics:viewMetrics, goals:viewGoals,
+    culture:viewCulture, quotes:viewQuotes, data:viewData
+  })[UI.view] || viewOverview;
+  $("#main").innerHTML = fn();
+  let bar = document.getElementById("mobilebar");
+  if(!bar){ bar = document.createElement("div"); bar.id="mobilebar"; bar.className="mobilebar"; document.body.appendChild(bar); }
+  bar.innerHTML = `<button class="btn primary" data-act="todo-quick">+ To-do</button>
+    <button class="btn" data-act="touch-add">+ Outreach</button>
+    <button class="btn" data-act="go" data-view="schools">Schools</button>`;
+  if(UI.view === "schools") setTimeout(initMap, 0);
+  window.scrollTo(0,0);
+}
+function go(v){ UI.view = v; render(); }
+
+function pageHead(title, lede, actions){
+  return `<div class="topbar"><div><h1>${h(title)}</h1><div class="lede">${h(lede)}</div></div>
+    <div class="spacer"></div><div class="chiprow">${actions||""}</div></div>`;
+}
+
+/* =====================================================================
+   7. VIEW — OVERVIEW
+   ===================================================================== */
+function currentQuote(){
+  if(!DB.quotes.length) return null;
+  const i = ((DB.settings.lastQuote||0) % DB.quotes.length + DB.quotes.length) % DB.quotes.length;
+  return DB.quotes[i];
+}
+function quoteCard(){
+  const q = currentQuote();
+  if(!q) return `<div class="quotecard"><div class="mark">❝</div><div><blockquote>Add a quote to get started.</blockquote>
+    <button class="btn sm" data-act="quote-add" style="margin-top:10px">Add a quote</button></div></div>`;
+  return `<div class="quotecard">
+    <div class="mark" aria-hidden="true">❝</div>
+    <div style="flex:1">
+      <blockquote>${h(q.text)}</blockquote>
+      <cite>— ${h(q.author||"Unknown")}</cite>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <button class="btn sm" data-act="quote-next" title="Next quote">↻</button>
+      <button class="btn sm ghost" data-act="quote-add" title="Add a quote">+</button>
+    </div>
+  </div>`;
+}
+
+function statTile(lbl, val, sub, tone){
+  return `<div class="stat"><div class="lbl">${h(lbl)}</div>
+    <div class="val" ${tone?`style="color:var(--${tone})"`:""}>${val}</div>
+    <div class="sub">${sub||""}</div></div>`;
+}
+
+function viewOverview(){
+  const yr = String(new Date().getFullYear());
+  const byProd = revenueByProduct(yr);
+  const totalYTD = sum(Object.values(byProd));
+  const clients = DB.schools.filter(s=>["client","booked"].includes(s.status)).length;
+  const pipeline = DB.schools.filter(s=>statusMeta(s.status).pipeline).length;
+  const od = overdueTodos(), open = openTodos(), fu = overdueFollowups();
+  const capacity = sum(DB.campWeeks, w=>w.capacity), reg = sum(DB.campWeeks, w=>w.registered);
+  const fill = capacity ? Math.round(reg/capacity*100) : null;
+  const bookGoal = DB.goals.find(g=>g.id==="g1");
+
+  const soonTodos = sortBy(open.filter(t=>t.due && daysUntil(t.due) <= 7), t=>t.due);
+  const soonDates = sortBy(DB.dates.filter(d=> daysUntil(d.date) >= -1 && daysUntil(d.date) <= 60), d=>d.date).slice(0,6);
+  const topGoals = DB.goals.filter(g=>g.status==="active").slice(0,4);
+  const touches = allTouches().slice(0,6);
+
+  let alerts = "";
+  if(od.length)  alerts += `<div class="banner warn"><b>${od.length} to-do${od.length>1?"s":""} past due</b><div class="spacer"></div>
+      <button class="btn sm" data-act="go" data-view="todos">Open to-dos</button></div>`;
+  if(fu.length)  alerts += `<div class="banner info"><b>${fu.length} school follow-up${fu.length>1?"s":""} overdue</b>
+      <span class="small">${h(fu.slice(0,3).map(s=>s.name).join(", "))}${fu.length>3?"…":""}</span><div class="spacer"></div>
+      <button class="btn sm" data-act="go" data-view="schools">Open schools</button></div>`;
+  if(SYNC.mode !== "file" && backupStale() && (DB.revenue.length || allTouches().length || DB.todos.length > 4)){
+    const a = backupAgeDays();
+    alerts += `<div class="banner crit-banner" style="background:var(--crit-bg);color:var(--crit)">
+      <b>${a===null ? "You have never backed this up." : "Last backup was "+a+" days ago."}</b>
+      <span class="small">If this browser's data gets cleared, everything here goes with it.</span>
+      <div class="spacer"></div><button class="btn sm" data-act="export-json">Back up now</button></div>`;
+  }
+  if(DB.settings.demo) alerts += `<div class="banner warn"><b>Demo numbers are loaded.</b> Revenue and metrics below are made up.
+      <div class="spacer"></div><button class="btn sm" data-act="demo-clear">Clear demo data</button></div>`;
+
+  const monthCats=[], fSer=[], cSer=[];
+  for(let m=0;m<12;m++){
+    const key = yr+"-"+String(m+1).padStart(2,"0");
+    monthCats.push(MONTHS[m]);
+    fSer.push(sum(DB.revenue.filter(r=>ym(r.date)===key && r.product==="Fundraising"), r=>r.amount));
+    cSer.push(sum(DB.revenue.filter(r=>ym(r.date)===key && r.product==="Summer Camp"), r=>r.amount));
+  }
+  const series = [
+    { name:"Fundraising", color:"var(--series-1)", values:fSer },
+    { name:"Summer Camp", color:"var(--series-2)", values:cSer }
+  ];
+
+  return pageHead("Overview", DB.meta.business + " · " + DB.meta.tagline,
+      `<button class="btn primary" data-act="todo-quick">+ To-do</button>
+       <button class="btn" data-act="touch-add">+ Log outreach</button>
+       <button class="btn" data-act="rev-add">+ Revenue</button>`)
+  + alerts
+  + quoteCard()
+  + `<div class="sectitle">Where things stand</div>
+  <div class="grid g4">
+    ${statTile("Revenue "+yr, totalYTD ? money(totalYTD) : "<small>Not entered yet</small>",
+        totalYTD ? money(byProd["Fundraising"])+" fundraising · "+money(byProd["Summer Camp"])+" camp" : "Add entries on the Revenue tab")}
+    ${statTile("Schools booked / active", clients, bookGoal ? `Goal ${bookGoal.target} by ${fmtDateShort(bookGoal.due)}` : "")}
+    ${statTile("Schools in pipeline", pipeline, pipeline?`${touchesThisMonth()} outreach touches this month`:"Add schools on the Schools tab")}
+    ${statTile("Open to-dos", open.length, od.length ? od.length+" past due" : "Nothing overdue — nice", od.length?"crit":null)}
+  </div>
+
+  <div class="grid g-2-1" style="margin-top:16px">
+    <div class="card">
+      <div class="cardhead"><h3>Revenue by month · ${h(yr)}</h3><div class="spacer"></div>
+        <button class="btn sm ghost" data-act="toggle-table" data-key="ov">${UI.showTable.ov?"Chart":"Table"}</button></div>
+      ${legendHTML(series)}
+      ${UI.showTable.ov ? revTable(monthCats, series) : groupedBars(monthCats, series, {aria:"Revenue by month, fundraising and summer camp"})}
+    </div>
+    <div class="card">
+      <div class="cardhead"><h3>This week</h3></div>
+      ${soonTodos.length ? soonTodos.slice(0,7).map(t=>todoRow(t,true)).join("")
+        : `<div class="empty small">Nothing due in the next 7 days.</div>`}
+      <div class="sectitle" style="margin-top:16px">Coming up</div>
+      ${soonDates.length ? soonDates.map(d=>`<div class="todoitem"><div class="body">
+            <div class="ttl">${h(d.title)}</div>
+            <div class="meta"><span class="tag neutral">${h(d.type||"Date")}</span>${h(fmtDate(d.date))} · ${h(relDays(d.date))}</div>
+          </div></div>`).join("")
+        : `<div class="empty small">No dates in the next 60 days.</div>`}
+    </div>
+  </div>
+
+  <div class="grid g-1-2" style="margin-top:16px">
+    <div class="card">
+      <div class="cardhead"><h3>Revenue mix · ${h(yr)}</h3></div>
+      ${legendHTML(series)}
+      ${shareBar([{name:"Fundraising",value:byProd["Fundraising"],color:"var(--series-1)"},
+                  {name:"Summer Camp",value:byProd["Summer Camp"],color:"var(--series-2)"}])}
+      <div class="grid g2" style="margin-top:14px">
+        <div><div class="lbl small muted">Fundraising</div><div style="font-size:19px;font-weight:700">${money(byProd["Fundraising"])}</div></div>
+        <div><div class="lbl small muted">Summer Camp</div><div style="font-size:19px;font-weight:700">${money(byProd["Summer Camp"])}</div></div>
+      </div>
+      ${fill!==null?`<div style="margin-top:16px"><div class="lbl small muted">Camp seats filled</div>
+        <div class="meter g"><i style="width:${Math.min(100,fill)}%"></i></div>
+        <div class="meterrow"><span>${reg} of ${capacity} seats</span><span>${fill}%</span></div></div>`:""}
+    </div>
+    <div class="card">
+      <div class="cardhead"><h3>Goal progress</h3><div class="spacer"></div>
+        <button class="btn sm ghost" data-act="go" data-view="goals">All goals</button></div>
+      ${topGoals.length ? topGoals.map(goalRow).join("") : `<div class="empty small">No active goals.</div>`}
+    </div>
+  </div>
+
+  <div class="grid g2" style="margin-top:16px">
+    <div class="card">
+      <div class="cardhead"><h3>Latest outreach</h3><div class="spacer"></div>
+        <button class="btn sm" data-act="touch-add">+ Log</button></div>
+      ${touches.length ? `<div class="tl">`+touches.map(o=>`<div class="tlitem">
+          <div class="d">${h(fmtDate(o.date))} · ${h(o.type||"Note")}</div>
+          <div class="t"><a href="#" data-act="school-open" data-id="${o.schoolId}">${h(o.schoolName)}</a></div>
+          ${o.summary?`<div class="n">${h(o.summary)}</div>`:""}
+        </div>`).join("")+`</div>`
+        : `<div class="empty"><div class="big">✉</div>No outreach logged yet.<br>Log a call, email or visit and it shows up here and on the school.</div>`}
+    </div>
+    <div class="card">
+      <div class="cardhead"><h3>Wins &amp; good news</h3><div class="spacer"></div>
+        <button class="btn sm" data-act="win-add">+ Add</button></div>
+      ${DB.wins.length ? sortBy(DB.wins,w=>w.date).reverse().slice(0,8).map(w=>`<div class="todoitem">
+          <div class="body"><div class="ttl">${h(w.text)}</div>
+            <div class="meta">${h(fmtDate(w.date))}${w.source?" · "+h(w.source):""}</div></div>
+          <div class="acts"><button class="btn sm ghost" data-act="win-del" data-id="${w.id}">✕</button></div>
+        </div>`).join("")
+        : `<div class="empty"><div class="big">★</div>Keep the receipts. Parent quotes, teacher thank-yous,<br>a number you're proud of — drop them here.</div>`}
+    </div>
+  </div>`;
+}
+
+function revTable(cats, series){
+  return `<table><thead><tr><th>Month</th>${series.map(s=>`<th class="num">${h(s.name)}</th>`).join("")}<th class="num">Total</th></tr></thead><tbody>`
+    + cats.map((c,i)=>{
+        const tot = sum(series, s=>s.values[i]||0);
+        if(!tot) return "";
+        return `<tr><td>${h(c)}</td>${series.map(s=>`<td class="num">${money(s.values[i]||0)}</td>`).join("")}<td class="num"><b>${money(tot)}</b></td></tr>`;
+      }).join("")
+    + `<tr><td><b>Total</b></td>${series.map(s=>`<td class="num"><b>${money(sum(s.values))}</b></td>`).join("")}
+       <td class="num"><b>${money(sum(series,s=>sum(s.values)))}</b></td></tr></tbody></table>`;
+}
+
+function goalRow(g){
+  const pct = g.target ? Math.min(100, Math.round((g.current/g.target)*100)) : 0;
+  const dLeft = daysUntil(g.due);
+  return `<div style="padding:10px 0;border-bottom:1px solid var(--rule)">
+    <div style="display:flex;gap:10px;align-items:baseline">
+      <div style="flex:1;font-size:14px">${h(g.title)}</div>
+      <div class="small muted nowrap">${fmtMetric(g.current,g.unit)} / ${fmtMetric(g.target,g.unit)}</div>
+    </div>
+    <div class="meter"><i style="width:${pct}%"></i></div>
+    <div class="meterrow"><span>${h(g.category||"")}</span>
+      <span>${pct}%${g.due?` · due ${h(fmtDateShort(g.due))}${dLeft<0?" (past)":""}`:""}</span></div>
+  </div>`;
+}
+
+/* =====================================================================
+   8. VIEW — TO-DOS   (one home for every list)
+   ===================================================================== */
+function todoRow(t, compact){
+  const prio = PRIOS.find(p=>p.k===t.priority) || PRIOS[2];
+  const late = t.due && daysUntil(t.due) < 0 && t.status!=="done";
+  const sch = t.schoolId ? school(t.schoolId) : null;
+  return `<div class="todoitem${t.status==="done"?" done":""}">
+    <button class="cb" data-act="todo-toggle" data-id="${t.id}" aria-label="Toggle done">${t.status==="done"?"✓":""}</button>
+    <div class="body">
+      <div class="ttl">${h(t.title)}</div>
+      <div class="meta">
+        ${t.due?`<span class="${late?"tag crit":""}">${late?"Late · ":""}${h(fmtDateShort(t.due))}${late?"":" · "+h(relDays(t.due))}</span>`:""}
+        ${t.area?`<span class="tag neutral">${h(t.area)}</span>`:""}
+        ${t.priority!=="low"?`<span class="tag ${prio.tone}">${h(prio.label)}</span>`:""}
+        ${sch?`<a href="#" data-act="school-open" data-id="${sch.id}">${h(sch.name)}</a>`:""}
+        ${!compact && t.notes?`<span class="muted">${h(t.notes.slice(0,90))}${t.notes.length>90?"…":""}</span>`:""}
+      </div>
+    </div>
+    <div class="acts">
+      <button class="btn sm ghost" data-act="todo-edit" data-id="${t.id}">Edit</button>
+      <button class="btn sm ghost" data-act="todo-del" data-id="${t.id}">✕</button>
+    </div>
+  </div>`;
+}
+
+function viewTodos(){
+  const all = DB.todos;
+  let list = all.filter(t=>{
+    if(UI.todoFilter==="open" && t.status==="done") return false;
+    if(UI.todoFilter==="done" && t.status!=="done") return false;
+    if(UI.todoFilter==="late" && !(t.status!=="done" && t.due && daysUntil(t.due)<0)) return false;
+    if(UI.todoArea!=="all" && t.area!==UI.todoArea) return false;
+    return true;
+  });
+  list = sortBy(list, t=>{
+    if(t.status==="done") return "9"+(t.completedAt||"");
+    const p = {high:"0",med:"1",low:"2"}[t.priority]||"2";
+    return (t.due ? "0"+t.due : "5") + p;
+  });
+
+  const groups = { "Past due":[], "Today":[], "Next 7 days":[], "Later":[], "No date":[], "Done":[] };
+  list.forEach(t=>{
+    if(t.status==="done"){ groups["Done"].push(t); return; }
+    const d = t.due ? daysUntil(t.due) : null;
+    if(d===null) groups["No date"].push(t);
+    else if(d<0)  groups["Past due"].push(t);
+    else if(d===0)groups["Today"].push(t);
+    else if(d<=7) groups["Next 7 days"].push(t);
+    else          groups["Later"].push(t);
+  });
+
+  const counts = { open: all.filter(t=>t.status!=="done").length,
+                   late: all.filter(t=>t.status!=="done" && t.due && daysUntil(t.due)<0).length,
+                   done: all.filter(t=>t.status==="done").length };
+
+  return pageHead("To-Dos", "One list. Everything else gets retired.",
+      `<button class="btn" data-act="todo-dump">⇩ Brain dump</button>
+       <button class="btn primary" data-act="todo-new">+ New to-do</button>`)
+  + `<div class="card" style="margin-bottom:16px">
+      <form class="quickadd" data-act="quickadd-form">
+        <input type="text" id="qa" placeholder="Type a to-do and press Enter…  (add &quot;!&quot; for high priority, &quot;today&quot; or &quot;tomorrow&quot; for a due date)">
+        <button type="submit" class="btn primary">Add</button>
+      </form>
+      <div class="small muted">Tip: paste a whole list with <b>Brain dump</b> — one to-do per line.</div>
+    </div>
+
+    <div class="chiprow" style="margin-bottom:14px">
+      <button class="chip" data-act="todo-filter" data-v="open" aria-pressed="${UI.todoFilter==="open"}">Open · ${counts.open}</button>
+      <button class="chip" data-act="todo-filter" data-v="late" aria-pressed="${UI.todoFilter==="late"}">Past due · ${counts.late}</button>
+      <button class="chip" data-act="todo-filter" data-v="done" aria-pressed="${UI.todoFilter==="done"}">Done · ${counts.done}</button>
+      <button class="chip" data-act="todo-filter" data-v="all" aria-pressed="${UI.todoFilter==="all"}">All</button>
+      <span style="width:14px"></span>
+      <button class="chip" data-act="todo-area" data-v="all" aria-pressed="${UI.todoArea==="all"}">Every area</button>
+      ${AREAS.map(a=>`<button class="chip" data-act="todo-area" data-v="${a}" aria-pressed="${UI.todoArea===a}">${h(a)}</button>`).join("")}
+    </div>`
+  + (list.length ? Object.entries(groups).filter(([,v])=>v.length).map(([k,v])=>`
+      <div class="sectitle">${h(k)} · ${v.length}</div>
+      <div class="card">${v.map(t=>todoRow(t)).join("")}</div>`).join("")
+    : `<div class="card"><div class="empty"><div class="big">✓</div>Nothing here.<br>
+        Add one above, or hit <b>Brain dump</b> to paste in a list from somewhere else.</div></div>`)
+  + (counts.done ? `<div style="margin-top:18px"><button class="btn ghost sm" data-act="todo-clear-done">Clear ${counts.done} completed</button></div>` : "");
+}
+
+/* Parses "!" for priority and today/tomorrow/mon-fri for a due date */
+function parseQuickTodo(raw){
+  let s = raw.trim(), priority="med", due="";
+  if(/(^|\s)!!?($|\s)/.test(s) || s.includes("!")){ priority="high"; s = s.replace(/!+/g,"").trim(); }
+  const low = s.toLowerCase();
+  const d = new Date();
+  if(/\btoday\b/.test(low)){ due = todayISO(); s = s.replace(/\btoday\b/i,"").trim(); }
+  else if(/\btomorrow\b/.test(low)){ d.setDate(d.getDate()+1); due = iso(d); s = s.replace(/\btomorrow\b/i,"").trim(); }
+  else {
+    const days = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
+    for(let i=0;i<7;i++){
+      if(new RegExp("\\b"+days[i]+"\\b").test(low)){
+        const delta = ((i - d.getDay()) + 7) % 7 || 7;
+        d.setDate(d.getDate()+delta); due = iso(d);
+        s = s.replace(new RegExp("\\b"+days[i]+"\\b","i"),"").trim();
+        break;
+      }
+    }
+  }
+  s = s.replace(/\s{2,}/g," ").replace(/^[-*•\s]+/,"").trim();
+  return { title:s, priority, due };
+}
+function iso(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+
+function addTodo(fields){
+  DB.todos.unshift(Object.assign({ id:uid("t"), title:"", notes:"", area:"Ops", priority:"med",
+    status:"open", due:"", schoolId:"", created:todayISO() }, fields));
+}
+
+/* =====================================================================
+   9. VIEW — SCHOOLS & MAP
+   ===================================================================== */
+function filteredSchools(){
+  const q = UI.schoolQuery.trim().toLowerCase();
+  return DB.schools.filter(s=>{
+    if(UI.schoolFilter==="active" && !["client","booked"].includes(s.status)) return false;
+    if(UI.schoolFilter==="pipeline" && !statusMeta(s.status).pipeline) return false;
+    if(!["all","active","pipeline"].includes(UI.schoolFilter) && s.status!==UI.schoolFilter) return false;
+    if(q){
+      const hay = [s.name,s.district,s.city,s.contactName,s.tier,(s.tags||[]).join(" "),s.notes].join(" ").toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function viewSchools(){
+  const list = sortBy(filteredSchools(), s=>s.name);
+  const counts = {};
+  STATUSES.forEach(st=> counts[st.k] = DB.schools.filter(s=>s.status===st.k).length);
+  const active = DB.schools.filter(s=>["client","booked"].includes(s.status)).length;
+  const approxN = DB.schools.filter(s=>s.approx).length;
+
+  return pageHead("Schools & Map", `${DB.schools.length} schools · ${active} booked or active · ${DB.schools.length-active} in the pipeline`,
+      `<button class="btn primary" data-act="school-new">+ Add school</button>
+       <button class="btn" data-act="touch-add">+ Log outreach</button>`)
+  + (approxN ? `<div class="banner info"><b>${approxN} pins are city-level approximations.</b>
+      Open a school and set its address or lat/lng to place it exactly.<div class="spacer"></div></div>` : "")
+  + `<div class="card flush" style="margin-bottom:16px">
+      <div id="map"></div>
+      <div style="padding:12px 16px;border-top:1px solid var(--rule);display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2)">
+        ${STATUSES.map(s=>`<span style="display:inline-flex;align-items:center;gap:6px">
+            <i style="width:11px;height:11px;border-radius:50%;background:${s.pin};display:inline-block"></i>${h(s.label)}</span>`).join("")}
+        <span style="display:inline-flex;align-items:center;gap:6px"><i style="width:11px;height:11px;border-radius:3px;background:var(--purple);display:inline-block"></i>Camp site</span>
+      </div>
+    </div>
+
+    <div class="chiprow" style="margin-bottom:12px">
+      <button class="chip" data-act="school-filter" data-v="all" aria-pressed="${UI.schoolFilter==="all"}">All · ${DB.schools.length}</button>
+      <button class="chip" data-act="school-filter" data-v="active" aria-pressed="${UI.schoolFilter==="active"}">Booked &amp; active · ${active}</button>
+      <button class="chip" data-act="school-filter" data-v="pipeline" aria-pressed="${UI.schoolFilter==="pipeline"}">In pipeline</button>
+      ${STATUSES.map(s=>`<button class="chip" data-act="school-filter" data-v="${s.k}" aria-pressed="${UI.schoolFilter===s.k}">${h(s.label)} · ${counts[s.k]}</button>`).join("")}
+      <span style="flex:1"></span>
+      <input type="text" id="schoolq" placeholder="Search schools, contacts, notes…" value="${h(UI.schoolQuery)}" style="max-width:260px">
+    </div>
+
+    <div class="card flush">
+      ${list.length ? `<table><thead><tr>
+        <th>School</th><th>District</th><th>Status</th><th>Tier</th>
+        <th>Next action</th><th class="num">Raised</th><th class="num">Touches</th></tr></thead><tbody>`
+        + list.map(s=>{
+            const st = statusMeta(s.status);
+            const late = s.nextActionDate && daysUntil(s.nextActionDate) < 0;
+            return `<tr class="click" data-act="school-open" data-id="${s.id}">
+              <td><b>${h(s.name)}</b>${s.approx?` <span class="small muted" title="Approximate map pin">≈</span>`:""}
+                  <div class="small muted">${h(s.city||"")}${s.students?` · ${s.students} students`:""}</div></td>
+              <td class="small">${h(s.district||"")}</td>
+              <td><span class="tag ${st.tone}">${h(st.label)}</span></td>
+              <td class="small">${h(s.tier||"—")}</td>
+              <td class="small">${s.nextAction?`${h(s.nextAction)}<div class="${late?"tag crit":"small muted"}">${late?"Late · ":""}${h(fmtDateShort(s.nextActionDate)||"no date")}</div>`:`<span class="muted">—</span>`}</td>
+              <td class="num">${schoolRevenue(s.id)?money(schoolRevenue(s.id)):`<span class="muted">—</span>`}</td>
+              <td class="num">${(s.outreach||[]).length||`<span class="muted">0</span>`}</td>
+            </tr>`;
+          }).join("") + `</tbody></table>`
+        : `<div class="empty"><div class="big">◉</div>No schools match that filter.</div>`}
+    </div>`;
+}
+
+/* ---------- Map ---------- */
+let _map = null, _layer = null;
+function initMap(){
+  const el = document.getElementById("map");
+  if(!el) return;
+  const pts = filteredSchools().filter(s=> isFinite(s.lat) && isFinite(s.lng) && (s.lat||s.lng));
+  const base = DB.meta.homeBase;
+
+  if(typeof L === "undefined"){ return fallbackMap(el, pts, base); }
+
+  el.innerHTML = "";
+  if(_map){ _map.remove(); _map = null; }
+  _map = L.map(el, { scrollWheelZoom:false });
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    { maxZoom:18, attribution:"© OpenStreetMap contributors" }).addTo(_map);
+  _layer = L.layerGroup().addTo(_map);
+
+  const bounds = [];
+  pts.forEach(s=>{
+    const st = statusMeta(s.status);
+    const icon = L.divIcon({ className:"", iconSize:[18,18], iconAnchor:[9,9], html:
+      `<span style="display:block;width:16px;height:16px;border-radius:50%;background:${st.pin};
+        border:2.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);${s.approx?"opacity:.72":""}"></span>` });
+    const m = L.marker([s.lat,s.lng],{icon}).addTo(_layer);
+    m.bindPopup(`<b>${h(s.name)}</b><br><span style="color:${st.pin}">${h(st.label)}</span>
+       ${s.tier?" · "+h(s.tier):""}<br>${h(s.district||"")}${s.approx?"<br><i>approximate location</i>":""}
+       <br><a href="#" onclick="openSchool('${s.id}');return false;">Open details →</a>`);
+    bounds.push([s.lat,s.lng]);
+  });
+  if(base && base.lat){
+    const icon = L.divIcon({ className:"", iconSize:[18,18], iconAnchor:[9,9], html:
+      `<span style="display:block;width:15px;height:15px;border-radius:3px;background:#c727d5;border:2.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></span>` });
+    L.marker([base.lat,base.lng],{icon}).addTo(_layer)
+      .bindPopup(`<b>${h(base.name)}</b><br>${h(base.address)}`);
+    bounds.push([base.lat,base.lng]);
+  }
+  if(bounds.length) _map.fitBounds(bounds, { padding:[40,40], maxZoom:12 });
+  else _map.setView([40.03,-83.0],10);
+  setTimeout(()=>_map.invalidateSize(), 120);
+}
+
+/* Offline / blocked-CDN fallback: plot the same points on a plain grid */
+function fallbackMap(el, pts, base){
+  const all = pts.concat(base && base.lat ? [{lat:base.lat,lng:base.lng,name:base.name,status:"base"}] : []);
+  if(!all.length){ el.outerHTML = `<div class="mapfallback"><div class="empty">Add a school with coordinates to see the map.</div></div>`; return; }
+  const lats = all.map(p=>p.lat), lngs = all.map(p=>p.lng);
+  const pad = 0.02;
+  const minLat=Math.min(...lats)-pad, maxLat=Math.max(...lats)+pad;
+  const minLng=Math.min(...lngs)-pad, maxLng=Math.max(...lngs)+pad;
+  const W=760,H=430,m=34;
+  const X = v => m + (v-minLng)/((maxLng-minLng)||1) * (W-2*m);
+  const Y = v => H-m - (v-minLat)/((maxLat-minLat)||1) * (H-2*m);
+  let g = `<rect x="0" y="0" width="${W}" height="${H}" fill="var(--surface-2)"/>`;
+  for(let i=0;i<=4;i++){
+    const x = m + i*(W-2*m)/4, y = m + i*(H-2*m)/4;
+    g += `<line x1="${x}" y1="${m}" x2="${x}" y2="${H-m}" stroke="var(--grid)"/>`;
+    g += `<line x1="${m}" y1="${y}" x2="${W-m}" y2="${y}" stroke="var(--grid)"/>`;
+  }
+  all.forEach(p=>{
+    const c = p.status==="base" ? "#c727d5" : statusMeta(p.status).pin;
+    g += `<circle cx="${X(p.lng).toFixed(1)}" cy="${Y(p.lat).toFixed(1)}" r="7" fill="${c}" stroke="var(--surface)" stroke-width="2"
+            ${p.id?`data-act="school-open" data-id="${p.id}" style="cursor:pointer"`:""} ${tip({t:p.name,rows:[["",""]]})}/>`;
+  });
+  el.outerHTML = `<div class="mapfallback">
+      <div class="banner warn" style="margin:12px 14px 0">Map tiles couldn't load (no internet). Showing a plain coordinate plot instead — everything else works normally.</div>
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">${g}</svg></div>`;
+}
+
+/* ---------- School detail drawer ---------- */
+function openSchool(id){
+  UI.selected = id;
+  const s = school(id); if(!s) return;
+  const st = statusMeta(s.status);
+  const rev = DB.revenue.filter(r=>r.schoolId===id);
+  const todos = DB.todos.filter(t=>t.schoolId===id && t.status!=="done");
+  const dates = sortBy(DB.dates.filter(d=>d.schoolId===id), d=>d.date);
+  const touches = sortBy(s.outreach||[], o=>o.date).reverse();
+  const late = s.nextActionDate && daysUntil(s.nextActionDate) < 0;
+
+  openOverlay(`<div class="drawer-back" data-act="backdrop"><div class="drawer">
+    <div class="dhead">
+      <div style="flex:1">
+        <h2>${h(s.name)}</h2>
+        <div class="small muted">${h([s.district,s.city,s.state].filter(Boolean).join(" · "))}</div>
+        <div class="chiprow" style="margin-top:8px">
+          <span class="tag ${st.tone}">${h(st.label)}</span>
+          ${s.tier?`<span class="tag brand">${h(s.tier)}</span>`:""}
+          ${(s.products||[]).map(p=>`<span class="tag neutral">${h(p)}</span>`).join("")}
+          ${(s.tags||[]).filter(Boolean).map(t=>`<span class="tag neutral">${h(t)}</span>`).join("")}
+        </div>
+      </div>
+      <button class="btn ghost sm" data-act="close">Close</button>
+    </div>
+    <div class="dbody">
+      <div class="chiprow">
+        <button class="btn primary sm" data-act="touch-add" data-id="${s.id}">+ Log outreach</button>
+        <button class="btn sm" data-act="school-edit" data-id="${s.id}">Edit school</button>
+        <button class="btn sm" data-act="todo-new" data-school="${s.id}">+ To-do</button>
+        <button class="btn sm" data-act="rev-add" data-school="${s.id}">+ Revenue</button>
+        <button class="btn sm" data-act="date-new" data-school="${s.id}">+ Key date</button>
+        <span style="flex:1"></span>
+        <button class="btn sm danger" data-act="school-del" data-id="${s.id}">Delete</button>
+      </div>
+
+      ${s.nextAction?`<div class="banner ${late?"warn":"info"}">
+        <b>Next:</b> ${h(s.nextAction)} ${s.nextActionDate?`· ${h(fmtDate(s.nextActionDate))} (${h(relDays(s.nextActionDate))})`:""}</div>`:""}
+
+      <div class="card">
+        <div class="cardhead"><h3>Details</h3></div>
+        <dl class="kv">
+          <dt>Contact</dt><dd>${s.contactName?h(s.contactName)+(s.contactRole?` <span class="muted">· ${h(s.contactRole)}</span>`:""):`<span class="muted">Not set</span>`}</dd>
+          <dt>Email</dt><dd>${s.contactEmail?`<a href="mailto:${h(s.contactEmail)}">${h(s.contactEmail)}</a>`:`<span class="muted">—</span>`}</dd>
+          <dt>Phone</dt><dd>${s.contactPhone?`<a href="tel:${h(s.contactPhone)}">${h(s.contactPhone)}</a>`:`<span class="muted">—</span>`}</dd>
+          <dt>Address</dt><dd>${h(s.address||"—")}${s.zip?" "+h(s.zip):""}</dd>
+          <dt>Students</dt><dd>${s.students?h(s.students):`<span class="muted">—</span>`}</dd>
+          <dt>Map pin</dt><dd class="small">${isFinite(s.lat)&&s.lat?`${s.lat}, ${s.lng} ${s.approx?`<span class="tag warn">approximate</span>`:""}`:`<span class="muted">not set</span>`}</dd>
+        </dl>
+        ${s.notes?`<div style="margin-top:14px"><div class="lbl small muted" style="text-transform:uppercase;letter-spacing:.07em;font-weight:700">Notes</div>
+          <div style="white-space:pre-wrap;margin-top:5px">${h(s.notes)}</div></div>`:""}
+      </div>
+
+      <div class="card">
+        <div class="cardhead"><h3>Outreach history</h3><div class="spacer"></div>
+          <span class="hint">${touches.length} logged</span></div>
+        ${touches.length? `<div class="tl">`+touches.map(o=>`<div class="tlitem">
+            <div class="d">${h(fmtDate(o.date))} · ${h(o.type||"Note")}</div>
+            <div class="t">${h(o.summary||"(no summary)")}</div>
+            ${o.outcome?`<div class="n"><b>Outcome:</b> ${h(o.outcome)}</div>`:""}
+            ${o.followUp?`<div class="n"><b>Follow-up:</b> ${h(o.followUp)}</div>`:""}
+            <div style="margin-top:5px"><button class="btn sm ghost" data-act="touch-del" data-id="${s.id}" data-tid="${o.id}">Delete</button></div>
+          </div>`).join("")+`</div>`
+          : `<div class="empty">Nothing logged yet. Every call, email, visit and PTA meeting goes here.</div>`}
+      </div>
+
+      <div class="grid g2">
+        <div class="card">
+          <div class="cardhead"><h3>Revenue</h3></div>
+          ${rev.length? `<table><tbody>${sortBy(rev,r=>r.date).reverse().map(r=>`<tr>
+              <td>${h(fmtDateShort(r.date)||r.date)}<div class="small muted">${h(r.product)}</div></td>
+              <td class="num">${money(r.amount)}</td></tr>`).join("")}
+              <tr><td><b>Total</b></td><td class="num"><b>${money(sum(rev,r=>r.amount))}</b></td></tr></tbody></table>`
+            : `<div class="empty small">No revenue recorded for this school.</div>`}
+        </div>
+        <div class="card">
+          <div class="cardhead"><h3>Open to-dos</h3></div>
+          ${todos.length? todos.map(t=>todoRow(t,true)).join("") : `<div class="empty small">None.</div>`}
+          ${dates.length?`<div class="sectitle" style="margin-top:14px">Dates</div>
+            ${dates.map(d=>`<div class="small" style="padding:4px 0">${h(fmtDate(d.date))} — ${h(d.title)}</div>`).join("")}`:""}
+        </div>
+      </div>
+    </div>
+  </div></div>`);
+}
+
+/* =====================================================================
+   10. VIEW — PIPELINE
+   ===================================================================== */
+function viewPipeline(){
+  const stages = STATUSES.filter(s=>s.pipeline);
+  const cols = stages.map(st=> ({ st, rows: DB.schools.filter(s=>s.status===st.k) }));
+  const total = sum(cols, c=>c.rows.length);
+  const booked = DB.schools.filter(s=>["booked","client","past"].includes(s.status)).length;
+  const contacted = DB.schools.filter(s=>s.status!=="target").length;
+  const winRate = contacted ? Math.round(booked/contacted*100) : 0;
+
+  return pageHead("Pipeline", "Every school, by how far along it is.",
+      `<button class="btn primary" data-act="school-new">+ Add school</button>`)
+  + `<div class="grid g4" style="margin-bottom:18px">
+      ${statTile("In pipeline", total, "Target through Booked")}
+      ${statTile("Contacted", contacted, "At least one touch or better")}
+      ${statTile("Booked / ran", booked, "")}
+      ${statTile("Contacted → booked", winRate+"%", contacted?`${booked} of ${contacted}`:"No data yet")}
+    </div>
+    <div class="grid" style="grid-template-columns:repeat(${stages.length},minmax(150px,1fr));overflow-x:auto">
+      ${cols.map(c=>`<div class="card" style="padding:13px">
+          <div style="display:flex;align-items:center;gap:7px;margin-bottom:10px">
+            <i style="width:10px;height:10px;border-radius:50%;background:${c.st.pin};display:inline-block"></i>
+            <b style="font-size:13px">${h(c.st.label)}</b>
+            <span class="muted small" style="margin-left:auto">${c.rows.length}</span>
+          </div>
+          ${c.rows.length? c.rows.map(s=>`<div class="todoitem" style="padding:8px 0">
+              <div class="body"><div class="ttl" style="font-size:13.5px"><a href="#" data-act="school-open" data-id="${s.id}">${h(s.name)}</a></div>
+                <div class="meta">${h(s.city||s.district||"")}</div></div></div>`).join("")
+            : `<div class="small muted" style="padding:10px 0">Empty</div>`}
+        </div>`).join("")}
+    </div>
+    <div class="sectitle">Needs a follow-up</div>
+    <div class="card flush">
+      ${(()=>{ const rows = sortBy(DB.schools.filter(s=>s.nextAction), s=>s.nextActionDate||"9999");
+         return rows.length? `<table><thead><tr><th>School</th><th>Next action</th><th>When</th><th>Status</th></tr></thead><tbody>`
+           + rows.map(s=>{ const late = s.nextActionDate && daysUntil(s.nextActionDate)<0;
+             return `<tr class="click" data-act="school-open" data-id="${s.id}"><td><b>${h(s.name)}</b></td>
+               <td>${h(s.nextAction)}</td>
+               <td>${s.nextActionDate?`<span class="${late?"tag crit":""}">${h(fmtDate(s.nextActionDate))}${late?" · late":""}</span>`:`<span class="muted">no date</span>`}</td>
+               <td><span class="tag ${statusMeta(s.status).tone}">${h(statusMeta(s.status).label)}</span></td></tr>`;}).join("")
+           + `</tbody></table>`
+           : `<div class="empty">No next actions set. Open a school and add one — that's what keeps the pipeline moving.</div>`; })()}
+    </div>`;
+}
+
+/* =====================================================================
+   11. VIEW — KEY DATES
+   ===================================================================== */
+function viewCalendar(){
+  const items = DB.dates.map(d=>Object.assign({kind:"date"},d))
+    .concat(DB.milestones.map(m=>({kind:"milestone", id:m.id, date:m.date, title:m.title, type:"Milestone", detail:m.detail, done:m.done})))
+    .concat(DB.campWeeks.map(w=>({kind:"camp", id:w.id, date:w.start, title:`Summer Camp — ${w.name} (${fmtDateShort(w.start)}–${fmtDateShort(w.end)})`, type:"Camp", detail:""})));
+  const upcoming = sortBy(items.filter(i=>daysUntil(i.date) >= 0), i=>i.date);
+  const past     = sortBy(items.filter(i=>daysUntil(i.date) < 0), i=>i.date).reverse();
+  const next = upcoming[0];
+
+  const byMonth = {};
+  upcoming.forEach(i=>{ const k = i.date.slice(0,7); (byMonth[k] = byMonth[k]||[]).push(i); });
+
+  return pageHead("Key Dates", "Fundraiser windows, camp weeks, deadlines and milestones.",
+      `<button class="btn primary" data-act="date-new">+ Add date</button>
+       <button class="btn" data-act="ms-new">+ Add milestone</button>`)
+  + (next ? `<div class="card" style="margin-bottom:16px;display:flex;gap:22px;align-items:center;flex-wrap:wrap">
+      <div><div class="lbl small muted" style="text-transform:uppercase;letter-spacing:.08em;font-weight:700">Next up</div>
+        <div style="font-family:'Bree Serif',serif;font-size:23px;margin-top:4px">${h(next.title)}</div>
+        <div class="muted small">${h(fmtDate(next.date,true))}</div></div>
+      <div style="flex:1"></div>
+      <div style="text-align:right"><div class="val" style="font-family:'Bree Serif',serif;font-size:40px;color:var(--purple)">${daysUntil(next.date)}</div>
+        <div class="muted small">days away</div></div>
+    </div>` : "")
+  + Object.entries(byMonth).map(([k,list])=>{
+      const d = parseISO(k+"-01");
+      return `<div class="sectitle">${d.toLocaleDateString("en-US",{month:"long",year:"numeric"})}</div>
+      <div class="card flush"><table><tbody>${list.map(i=>`
+        <tr${i.kind!=="camp"?` class="click" data-act="${i.kind==="date"?"date-edit":"ms-edit"}" data-id="${i.id}"`:""}>
+          <td style="width:120px"><b>${h(fmtDateShort(i.date))}</b><div class="small muted">${h(relDays(i.date))}</div></td>
+          <td><b>${h(i.title)}</b>${i.detail?`<div class="small muted">${h(i.detail)}</div>`:""}</td>
+          <td style="width:130px"><span class="tag ${i.kind==="milestone"?"brand":"neutral"}">${h(i.type||"Date")}</span></td>
+        </tr>`).join("")}</tbody></table></div>`;
+    }).join("")
+  + (upcoming.length?"":`<div class="card"><div class="empty"><div class="big">▤</div>Nothing scheduled ahead.</div></div>`)
+  + (past.length? `<div class="sectitle">Already happened</div><div class="card flush"><table><tbody>${
+      past.slice(0,20).map(i=>`<tr${i.kind!=="camp"?` class="click" data-act="${i.kind==="date"?"date-edit":"ms-edit"}" data-id="${i.id}"`:""}>
+        <td style="width:120px" class="muted">${h(fmtDate(i.date))}</td>
+        <td class="muted">${h(i.title)}</td>
+        <td style="width:130px"><span class="tag neutral">${h(i.type||"Date")}</span></td></tr>`).join("")
+    }</tbody></table></div>`:"");
+}
+
+/* =====================================================================
+   12. VIEW — REVENUE
+   ===================================================================== */
+function viewRevenue(){
+  const yr = UI.revYear;
+  const rows = sortBy(DB.revenue.filter(r=>String(r.date).slice(0,4)===yr), r=>r.date).reverse();
+  const byProd = revenueByProduct(yr);
+  const total = sum(Object.values(byProd));
+  const exp = DB.expenses.filter(e=>String(e.date).slice(0,4)===yr);
+  const expTotal = sum(exp, e=>e.amount);
+  const net = total - expTotal;
+  const margin = total ? Math.round(net/total*100) : 0;
+
+  const cats=[], fS=[], cS=[];
+  for(let m=0;m<12;m++){
+    const key = yr+"-"+String(m+1).padStart(2,"0");
+    cats.push(MONTHS[m]);
+    fS.push(sum(DB.revenue.filter(r=>ym(r.date)===key && r.product==="Fundraising"), r=>r.amount));
+    cS.push(sum(DB.revenue.filter(r=>ym(r.date)===key && r.product==="Summer Camp"), r=>r.amount));
+  }
+  const series = [ {name:"Fundraising",color:"var(--series-1)",values:fS},
+                   {name:"Summer Camp",color:"var(--series-2)",values:cS} ];
+
+  const perSchool = sortBy(DB.schools.map(s=>({s, amt:sum(DB.revenue.filter(r=>r.schoolId===s.id && String(r.date).slice(0,4)===yr), r=>r.amount)}))
+                     .filter(x=>x.amt>0), x=>-x.amt);
+  const capacity = sum(DB.campWeeks, w=>w.capacity), reg = sum(DB.campWeeks, w=>w.registered);
+
+  return pageHead("Revenue", "Fundraising vs Summer Camp, month by month.",
+      `${years().map(y=>`<button class="chip" data-act="rev-year" data-v="${y}" aria-pressed="${yr===y}">${y}</button>`).join("")}
+       <button class="btn primary" data-act="rev-add">+ Revenue</button>
+       <button class="btn" data-act="exp-add">+ Expense</button>`)
+  + `<div class="grid g4" style="margin-bottom:16px">
+      ${statTile("Total revenue "+yr, total?money(total):"<small>—</small>", rows.length+" entries")}
+      ${statTile("Fundraising", money(byProd["Fundraising"]), total?Math.round(byProd["Fundraising"]/total*100)+"% of revenue":"")}
+      ${statTile("Summer Camp", money(byProd["Summer Camp"]), total?Math.round(byProd["Summer Camp"]/total*100)+"% of revenue":"")}
+      ${statTile("Net after expenses", net?money(net):"<small>—</small>", expTotal?`${money(expTotal)} expenses · ${margin}% margin`:"No expenses entered")}
+    </div>
+
+    <div class="card">
+      <div class="cardhead"><h3>Revenue by month</h3><div class="spacer"></div>
+        <button class="btn sm ghost" data-act="toggle-table" data-key="rev">${UI.showTable.rev?"Chart":"Table"}</button></div>
+      ${legendHTML(series)}
+      ${UI.showTable.rev ? revTable(cats, series) : groupedBars(cats, series, {aria:"Revenue by month by product"})}
+    </div>
+
+    <div class="grid g2" style="margin-top:16px">
+      <div class="card">
+        <div class="cardhead"><h3>Product mix</h3></div>
+        ${legendHTML(series)}
+        ${shareBar([{name:"Fundraising",value:byProd["Fundraising"],color:"var(--series-1)"},
+                    {name:"Summer Camp",value:byProd["Summer Camp"],color:"var(--series-2)"}])}
+        <div class="sectitle">Camp weeks</div>
+        ${DB.campWeeks.length? `<table><thead><tr><th>Week</th><th>Dates</th><th class="num">Registered</th><th class="num">Seats</th><th class="num">Full</th></tr></thead><tbody>`
+          + DB.campWeeks.map(w=>`<tr class="click" data-act="camp-edit" data-id="${w.id}">
+              <td><b>${h(w.name)}</b> <span class="small muted">${w.year}</span></td>
+              <td class="small">${h(fmtDateShort(w.start))}–${h(fmtDateShort(w.end))}</td>
+              <td class="num">${w.registered||0}</td><td class="num">${w.capacity||0}</td>
+              <td class="num">${w.capacity?Math.round(w.registered/w.capacity*100)+"%":"—"}</td></tr>`).join("")
+          + `<tr><td colspan="2"><b>All weeks</b></td><td class="num"><b>${reg}</b></td><td class="num"><b>${capacity}</b></td>
+             <td class="num"><b>${capacity?Math.round(reg/capacity*100)+"%":"—"}</b></td></tr></tbody></table>`
+          : `<div class="empty small">No camp weeks yet.</div>`}
+        <button class="btn sm" data-act="camp-new" style="margin-top:10px">+ Add camp week</button>
+      </div>
+
+      <div class="card">
+        <div class="cardhead"><h3>Top schools · ${h(yr)}</h3></div>
+        ${perSchool.length? `<table><tbody>${perSchool.slice(0,10).map(x=>`<tr class="click" data-act="school-open" data-id="${x.s.id}">
+            <td><b>${h(x.s.name)}</b><div class="small muted">${h(x.s.tier||statusMeta(x.s.status).label)}</div></td>
+            <td class="num">${money(x.amt)}</td></tr>`).join("")}</tbody></table>`
+          : `<div class="empty small">Tag revenue entries to a school to see this.</div>`}
+        <div class="sectitle">Expenses · ${h(yr)}</div>
+        ${exp.length? `<table><tbody>${sortBy(exp,e=>e.date).reverse().slice(0,12).map(e=>`<tr>
+            <td>${h(fmtDateShort(e.date))}<div class="small muted">${h(e.category||"")}${e.note?" · "+h(e.note):""}</div></td>
+            <td class="num">${money(e.amount)}</td>
+            <td style="width:34px"><button class="btn sm ghost" data-act="exp-del" data-id="${e.id}">✕</button></td></tr>`).join("")}
+            <tr><td><b>Total</b></td><td class="num"><b>${money(expTotal)}</b></td><td></td></tr></tbody></table>`
+          : `<div class="empty small">No expenses recorded for ${h(yr)}.</div>`}
+      </div>
+    </div>
+
+    <div class="sectitle">All revenue entries · ${h(yr)}</div>
+    <div class="card flush">
+      ${rows.length? `<table><thead><tr><th>Date</th><th>Product</th><th>School</th><th>Note</th><th class="num">Amount</th><th></th></tr></thead><tbody>`
+        + rows.map(r=>`<tr>
+            <td class="nowrap">${h(fmtDate(r.date))}</td>
+            <td><span class="tag ${r.product==="Fundraising"?"brand":"good"}">${h(r.product)}</span></td>
+            <td>${r.schoolId && school(r.schoolId) ? `<a href="#" data-act="school-open" data-id="${r.schoolId}">${h(school(r.schoolId).name)}</a>` : `<span class="muted">—</span>`}</td>
+            <td class="small">${h(r.note||"")}</td>
+            <td class="num"><b>${money(r.amount)}</b></td>
+            <td style="width:80px"><button class="btn sm ghost" data-act="rev-edit" data-id="${r.id}">Edit</button></td></tr>`).join("")
+        + `</tbody></table>`
+        : `<div class="empty"><div class="big">$</div>No revenue entered for ${h(yr)} yet.<br>
+            <button class="btn primary sm" data-act="rev-add" style="margin-top:12px">Add the first entry</button></div>`}
+    </div>`;
+}
+
+/* =====================================================================
+   13. VIEW — METRICS
+   ===================================================================== */
+function autoMetric(m){
+  switch(m.auto){
+    case "touchesThisMonth": return touchesThisMonth();
+    case "schoolsRun":       return DB.schools.filter(s=>["client","past"].includes(s.status)).length;
+    case "winRate": {
+      const contacted = DB.schools.filter(s=>s.status!=="target").length;
+      const booked = DB.schools.filter(s=>["booked","client","past"].includes(s.status)).length;
+      return contacted ? Math.round(booked/contacted*100) : 0;
+    }
+    case "campWeeks":        return DB.campWeeks.length;
+  }
+  return null;
+}
+function viewMetrics(){
+  const cats = Array.from(new Set(DB.metrics.map(m=>m.cat||"Other")));
+  const yr = String(new Date().getFullYear());
+  const byProd = revenueByProduct(yr);
+  const derived = [
+    { label:"Revenue this year", value:money(sum(Object.values(byProd))), sub:"All products" },
+    { label:"Schools in pipeline", value:DB.schools.filter(s=>statusMeta(s.status).pipeline).length, sub:"Target → Booked" },
+    { label:"Outreach touches (all time)", value:allTouches().length, sub:touchesThisMonth()+" this month" },
+    { label:"Avg revenue per active school", value:(()=>{ const n=DB.schools.filter(s=>["client","booked","past"].includes(s.status)).length;
+        return n? money(sum(DB.revenue,r=>r.amount)/n) : "—"; })(), sub:"All time" },
+    { label:"Open to-dos", value:openTodos().length, sub:overdueTodos().length+" past due" },
+    { label:"Camp seats filled", value:(()=>{ const c=sum(DB.campWeeks,w=>w.capacity); return c? Math.round(sum(DB.campWeeks,w=>w.registered)/c*100)+"%" : "—"; })(), sub:"All weeks" }
+  ];
+
+  return pageHead("Metrics", "The numbers you check, not the numbers you admire.",
+      `<button class="btn primary" data-act="metric-new">+ Add metric</button>`)
+  + `<div class="sectitle">Calculated from your data</div>
+     <div class="grid g3">${derived.map(d=>statTile(d.label, d.value, d.sub)).join("")}</div>`
+  + cats.map(c=>`<div class="sectitle">${h(c)}</div>
+      <div class="grid g3">${DB.metrics.filter(m=>(m.cat||"Other")===c).map(m=>{
+        const v = autoMetric(m); const val = v===null ? m.value : v;
+        const pct = m.target ? Math.min(100, Math.round((val/m.target)*100)) : 0;
+        return `<div class="card">
+          <div class="cardhead"><h3 style="font-size:14.5px;flex:1">${h(m.label)}</h3>
+            <button class="btn sm ghost" data-act="metric-edit" data-id="${m.id}">Edit</button></div>
+          <div class="val" style="font-family:'Bree Serif',serif;font-size:29px">${fmtMetric(val,m.unit)}</div>
+          ${m.target?`<div class="meter"><i style="width:${pct}%"></i></div>
+            <div class="meterrow"><span>Target ${fmtMetric(m.target,m.unit)}</span><span>${pct}%</span></div>`:""}
+          ${(m.history&&m.history.length>1)?sparkline(m.history):""}
+          ${m.note?`<div class="small muted" style="margin-top:8px">${h(m.note)}${v!==null?" · auto":""}</div>`:""}
+        </div>`;}).join("")}</div>`).join("");
+}
+
+/* =====================================================================
+   14. VIEW — GOALS & MILESTONES
+   ===================================================================== */
+function viewGoals(){
+  const active = DB.goals.filter(g=>g.status==="active");
+  const done   = DB.goals.filter(g=>g.status!=="active");
+  const ms = sortBy(DB.milestones, m=>m.date);
+  return pageHead("Goals & Milestones", "Where this is going, and how far along it is.",
+      `<button class="btn primary" data-act="goal-new">+ Add goal</button>
+       <button class="btn" data-act="ms-new">+ Add milestone</button>`)
+  + `<div class="grid g2">
+      ${active.map(g=>{
+        const pct = g.target? Math.min(100,Math.round(g.current/g.target*100)) : 0;
+        const dl = daysUntil(g.due);
+        return `<div class="card">
+          <div class="cardhead"><span class="tag brand">${h(g.category||"Goal")}</span><div class="spacer"></div>
+            <button class="btn sm ghost" data-act="goal-edit" data-id="${g.id}">Edit</button></div>
+          <h3 style="font-size:17px;line-height:1.25">${h(g.title)}</h3>
+          ${g.detail?`<div class="small muted" style="margin-top:6px">${h(g.detail)}</div>`:""}
+          <div style="display:flex;align-items:baseline;gap:8px;margin-top:14px">
+            <span style="font-family:'Bree Serif',serif;font-size:26px">${fmtMetric(g.current,g.unit)}</span>
+            <span class="muted">of ${fmtMetric(g.target,g.unit)}</span>
+          </div>
+          <div class="meter"><i style="width:${pct}%"></i></div>
+          <div class="meterrow"><span>${pct}% there</span>
+            <span>${g.due? (dl>=0? `${dl} days left · ${h(fmtDate(g.due))}` : `Past due · ${h(fmtDate(g.due))}`) : "No deadline"}</span></div>
+        </div>`;}).join("") || `<div class="card"><div class="empty">No active goals yet.</div></div>`}
+    </div>
+
+    <div class="sectitle">Milestones</div>
+    <div class="card">
+      ${ms.length? `<div class="tl">`+ms.map(m=>`<div class="tlitem">
+          <div class="d">${h(fmtDate(m.date))} · ${h(relDays(m.date))}</div>
+          <div class="t" style="display:flex;gap:9px;align-items:center">
+            <button class="cb" data-act="ms-toggle" data-id="${m.id}" style="width:18px;height:18px;flex:0 0 18px;border:2px solid var(--rule-strong);border-radius:5px;${m.done?"background:var(--green);border-color:var(--green);color:#fff":""}">${m.done?"✓":""}</button>
+            <span style="${m.done?"text-decoration:line-through;color:var(--muted)":""}">${h(m.title)}</span>
+            <button class="btn sm ghost" data-act="ms-edit" data-id="${m.id}">Edit</button>
+          </div>
+          ${m.detail?`<div class="n">${h(m.detail)}</div>`:""}
+        </div>`).join("")+`</div>` : `<div class="empty">No milestones yet.</div>`}
+    </div>
+    ${done.length? `<div class="sectitle">Closed goals</div><div class="card flush"><table><tbody>${
+      done.map(g=>`<tr class="click" data-act="goal-edit" data-id="${g.id}"><td>${h(g.title)}</td>
+        <td class="num">${fmtMetric(g.current,g.unit)} / ${fmtMetric(g.target,g.unit)}</td>
+        <td style="width:110px"><span class="tag ${g.status==="hit"?"good":"neutral"}">${h(g.status)}</span></td></tr>`).join("")
+      }</tbody></table></div>`:""}`;
+}
+
+/* =====================================================================
+   15. VIEW — CULTURAL VALUES
+   ===================================================================== */
+function viewCulture(){
+  return pageHead("Cultural Values", "What the company is, on the days it would be easier not to be.",
+      `<button class="btn" data-act="vgroup-new">+ Add a group</button>`)
+  + `<div class="card" style="margin-bottom:18px;background:linear-gradient(135deg,var(--purple-soft),var(--surface) 70%)">
+      <div class="small muted" style="letter-spacing:.09em;text-transform:uppercase;font-weight:700">Mission</div>
+      <div style="font-family:'Bree Serif',serif;font-size:22px;line-height:1.3;margin-top:7px">${h(DB.meta.tagline)}</div>
+      <div class="muted" style="margin-top:8px;max-width:70ch">Every student included. Families donate to a story, not a catalog.
+        Teachers get supported, not assigned homework. The school is stronger after we leave.</div>
+      <button class="btn sm" data-act="meta-edit" style="margin-top:12px">Edit mission</button>
+    </div>`
+  + DB.valueGroups.map(g=>`
+      <div class="sectitle">${h(g.title)}
+        <button class="btn sm ghost" data-act="vgroup-edit" data-id="${g.id}">edit</button>
+        <button class="btn sm ghost" data-act="value-new" data-id="${g.id}">+ value</button></div>
+      ${g.blurb?`<div class="small muted" style="margin:-4px 0 10px">${h(g.blurb)}</div>`:""}
+      <div class="grid g3">
+        ${g.items.map(v=>`<div class="card">
+          <div style="font-size:26px;line-height:1">${h(v.icon||"◆")}</div>
+          <h3 style="margin-top:9px;font-size:17px;color:var(--purple-dark)">${h(v.title)}</h3>
+          <div class="muted" style="margin-top:6px;font-size:13.5px">${h(v.text)}</div>
+          <div style="margin-top:10px"><button class="btn sm ghost" data-act="value-edit" data-g="${g.id}" data-id="${v.id}">Edit</button></div>
+        </div>`).join("")}
+      </div>`).join("");
+}
+
+/* =====================================================================
+   16. VIEW — QUOTES
+   ===================================================================== */
+function viewQuotes(){
+  return pageHead("Inspirational Quotes", `${DB.quotes.length} loaded · one shows on the Overview each time you open it.`,
+      `<button class="btn primary" data-act="quote-add">+ Add quote</button>`)
+  + quoteCard()
+  + `<div class="sectitle">All quotes</div>
+     <div class="card flush">
+      ${DB.quotes.length? `<table><tbody>${DB.quotes.map((q,i)=>`<tr>
+          <td style="width:44px" class="muted">${i+1}</td>
+          <td><div style="font-family:'Bree Serif',serif;font-size:16px">${h(q.text)}</div>
+              <div class="small muted">— ${h(q.author||"Unknown")}</div></td>
+          <td style="width:170px" class="nowrap">
+            <button class="btn sm ghost" data-act="quote-show" data-i="${i}">Show</button>
+            <button class="btn sm ghost" data-act="quote-edit" data-id="${q.id}">Edit</button>
+            <button class="btn sm ghost" data-act="quote-del" data-id="${q.id}">✕</button></td></tr>`).join("")}</tbody></table>`
+        : `<div class="empty">No quotes yet.</div>`}
+     </div>`;
+}
+
+/* =====================================================================
+   17. VIEW — DATA & BACKUP
+   ===================================================================== */
+function viewData(){
+  let bytes = 0;
+  try{ bytes = (localStorage.getItem(KEY)||"").length; }catch(e){}
+  return pageHead("Data & Backup", "Everything lives in this browser. Export a copy regularly.",
+      `<button class="btn primary" data-act="export-json">⇧ Export JSON</button>
+       <button class="btn" data-act="import-json">⇩ Import JSON</button>`)
+  + `<div class="grid g2">
+      <div class="card" style="grid-column:1/-1">
+        <div class="cardhead"><h3>Data file</h3><div class="spacer"></div>
+          ${SYNC.mode==="file"?`<span class="tag good">Connected</span>`:`<span class="tag ${SYNC.supported?"warn":"neutral"}">${SYNC.supported?"Not connected":"Unavailable here"}</span>`}</div>
+        ${SYNC.mode==="file"
+          ? `<p class="small">Every change writes straight into <b>${h(SYNC.name)}</b> on disk${SYNC.lastWrite?` — last written at ${h(SYNC.lastWrite)}`:""}.
+               Keep that file in a folder covered by iCloud Drive or Time Machine and your data is safe even if this browser is wiped.</p>
+             <div class="chiprow" style="margin-top:12px">
+               <button class="btn" data-act="sync-open">Switch to another file…</button>
+               <button class="btn ghost" data-act="sync-disconnect">Disconnect</button></div>`
+          : SYNC.mode==="needs-permission"
+          ? `<p class="small">You were saving to <b>${h(SYNC.name)}</b>. Chrome asks for permission again each time you reopen the dashboard.</p>
+             <button class="btn primary" data-act="sync-reconnect" style="margin-top:10px">Reconnect ${h(SYNC.name)}</button>`
+          : SYNC.supported
+          ? `<p class="small">Pick a file once and the dashboard writes to it on every change — no more remembering to export.
+               Put it in your TopKid Business Folder so iCloud or Time Machine carries it.</p>
+             <div class="chiprow" style="margin-top:12px">
+               <button class="btn primary" data-act="sync-connect">Save to a new file…</button>
+               <button class="btn" data-act="sync-open">Open an existing data file…</button></div>`
+          : `<p class="small">Saving straight to a file needs the dashboard opened from a real address rather than straight off disk.
+               Double-click <b>Start TopKid Dashboard.command</b> in your business folder instead of the HTML file, and this turns on.
+               It also needs Chrome or Edge — Safari doesn't support it.</p>`}
+      </div>
+
+      <div class="card" style="grid-column:1/-1">
+        <div class="cardhead"><h3>Sync across devices (GitHub)</h3><div class="spacer"></div>
+          ${ghConfigured()?`<span class="tag ${GH.mode==="error"||GH.mode==="conflict"?"warn":"good"}">${h(GH.mode)}</span>`:`<span class="tag neutral">Not set up</span>`}</div>
+        ${ghConfigured()
+          ? `<p class="small">Every change commits to <b>${h(ghCfg().owner)}/${h(ghCfg().repo)}/${h(ghCfg().path)}</b>.
+               Open the same web address on your phone, paste the same token, and both stay in step.
+               ${GH.last?`Last sync ${h(GH.last)}.`:""}</p>
+             ${GH.error?`<div class="banner warn" style="margin-top:10px">${h(GH.error)}</div>`:""}
+             <div class="chiprow" style="margin-top:12px">
+               <button class="btn primary" data-act="gh-sync">Sync now</button>
+               <button class="btn" data-act="gh-history">Version history</button>
+               <button class="btn" data-act="gh-setup">Settings</button>
+               <button class="btn ghost" data-act="gh-forget">Sign out of this device</button></div>`
+          : `<p class="small">Point the dashboard at a private GitHub repo and every save becomes a commit —
+               giving you off-machine storage, restore-any-past-version, and the same data on your phone and iPad.</p>
+             <button class="btn primary" data-act="gh-setup" style="margin-top:12px">Set up sync</button>`}
+      </div>
+
+      <div class="card">
+        <div class="cardhead"><h3>Where your data lives</h3></div>
+        <p class="small">${SYNC.mode==="file"
+          ? `Your data is written to <b>${h(SYNC.name)}</b> on disk, with a copy kept in this browser as a fallback.`
+          : `Right now everything is saved to <b>localStorage</b> for this browser on this Mac — no server, no account, no internet needed. That is convenient but fragile; connect a data file above to fix it.`}</p>
+        <dl class="kv" style="margin-top:10px">
+          <dt>Last backup</dt><dd>${DB.meta.lastBackup
+              ? `${h(fmtDate(DB.meta.lastBackup))} <span class="tag ${backupStale()?"crit":"good"}">${backupAgeDays()} days ago</span>`
+              : `<span class="tag crit">Never</span>`}</dd>
+          <dt>Storage key</dt><dd class="small mono">${h(KEY)}</dd>
+          <dt>Size</dt><dd>${(bytes/1024).toFixed(1)} KB</dd>
+          <dt>Schools</dt><dd>${DB.schools.length}</dd>
+          <dt>Outreach</dt><dd>${allTouches().length}</dd>
+          <dt>To-dos</dt><dd>${DB.todos.length}</dd>
+          <dt>Revenue rows</dt><dd>${DB.revenue.length}</dd>
+        </dl>
+        <div class="banner warn" style="margin-top:14px">Clearing your browser's site data would erase this.
+          Export a JSON backup once a month and keep it in this folder.</div>
+      </div>
+      <div class="card">
+        <div class="cardhead"><h3>Tools</h3></div>
+        <div style="display:grid;gap:10px">
+          <div><button class="btn" data-act="export-json">Export a JSON backup</button>
+            <div class="small muted" style="margin-top:4px">Downloads everything as one file.</div></div>
+          <div><button class="btn" data-act="import-json">Import a JSON backup</button>
+            <div class="small muted" style="margin-top:4px">Replaces everything currently in the dashboard.</div></div>
+          <div><button class="btn" data-act="print">Print / save as PDF</button>
+            <div class="small muted" style="margin-top:4px">Prints the tab you're on. Good for board meetings.</div></div>
+          <div>${DB.settings.demo
+            ? `<button class="btn" data-act="demo-clear">Clear demo numbers</button>
+               <div class="small muted" style="margin-top:4px">Removes the sample revenue and statuses only. Your real entries stay.</div>`
+            : `<button class="btn" data-act="demo-load">Load demo numbers</button>
+               <div class="small muted" style="margin-top:4px">Fills the charts with obviously-fake data so you can see how it all looks. Reversible.</div>`}</div>
+          <div style="border-top:1px solid var(--rule);padding-top:12px">
+            <button class="btn danger" data-act="reset-all">Reset everything to the starting data</button>
+            <div class="small muted" style="margin-top:4px">Wipes your entries and restores the seed. Export first.</div></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function download(name, text, type){
+  const blob = new Blob([text], {type: type||"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 400);
+}
+function backupAgeDays(){
+  if(!DB.meta.lastBackup) return null;
+  const n = daysUntil(DB.meta.lastBackup);
+  return n===null ? null : Math.abs(n);
+}
+function backupStale(){ const a = backupAgeDays(); return a===null || a > 14; }
+function exportJSON(){
+  DB.meta.lastBackup = todayISO();
+  download(`topkid-dashboard-${todayISO()}.json`, JSON.stringify(DB,null,2));
+  save(); renderSidebar();
+  toast("Backup downloaded. Move it into your TopKid Business Folder.");
+}
+function importJSON(){
+  const inp = document.createElement("input");
+  inp.type="file"; inp.accept="application/json,.json";
+  inp.onchange = ()=>{
+    const f = inp.files[0]; if(!f) return;
+    const r = new FileReader();
+    r.onload = ()=>{
+      try{
+        const d = JSON.parse(r.result);
+        if(!d || typeof d!=="object" || !("schools" in d)) throw new Error("Not a dashboard backup");
+        DB = Object.assign(clone(SEED), d);
+        commit(); toast("Backup loaded.");
+      }catch(e){ toast("That file isn't a dashboard backup.", "crit"); }
+    };
+    r.readAsText(f);
+  };
+  inp.click();
+}
+
+/* ---------- Demo data (clearly reversible) ---------- */
+function loadDemo(){
+  const y = new Date().getFullYear();
+  const camp = [0,0,0,0,0,9500,14200,7800,0,0,0,0];
+  const fund = [0,4200,18600,22400,3100,0,0,0,2400,26800,19400,5200];
+  MONTHS.forEach((_,m)=>{
+    const key = `${y}-${String(m+1).padStart(2,"0")}-15`;
+    if(fund[m]) DB.revenue.push({id:uid("r"), date:key, product:"Fundraising", amount:fund[m], schoolId:"", note:"Demo", demo:true});
+    if(camp[m]) DB.revenue.push({id:uid("r"), date:key, product:"Summer Camp", amount:camp[m], schoolId:"", note:"Demo", demo:true});
+  });
+  [["Materials",4800],["Marketing",2600],["Camp staff",11200],["Software",1450],["Insurance",1900]].forEach((e,i)=>{
+    DB.expenses.push({id:uid("e"), date:`${y}-${String(i*2+2).padStart(2,"0")}-10`, category:e[0], amount:e[1], note:"Demo", demo:true});
+  });
+  const flow = ["client","client","booked","proposal","meeting","contacted","contacted","target","target","lost","target","booked"];
+  DB.schools.forEach((s,i)=>{
+    if(!s._demoPrev){ s._demoPrev = {status:s.status, tier:s.tier}; }
+    s.status = flow[i % flow.length];
+    if(["client","booked","past"].includes(s.status)) s.tier = i%2 ? "TK Partner" : "Blueprint";
+    if(s.status!=="target"){
+      s.outreach = (s.outreach||[]).concat([
+        {id:uid("o"), date:`${y}-09-0${(i%9)+1}`, type:"Email", summary:"Demo — intro email to PTA president.", outcome:"Opened, no reply yet", followUp:"", demo:true},
+        {id:uid("o"), date:`${y}-09-1${(i%9)}`, type:"Call", summary:"Demo — 10 min call about the fall window.", outcome:"Asked for the Blueprint PDF", followUp:"Send Blueprint", demo:true}
+      ]);
+    }
+  });
+  DB.campWeeks.forEach((w,i)=>{ w.capacity = 40; w.registered = [31,36,24,29][i%4]; w.price = 285; });
+  DB.wins.push({id:uid("w"), date:todayISO(), text:"Demo — a parent wrote in that her son used 'perseverance' at the dinner table.", source:"Demo", demo:true});
+  DB.settings.demo = true;
+  commit(); toast("Demo numbers loaded — clear them any time.");
+}
+function clearDemo(){
+  DB.revenue  = DB.revenue.filter(r=>!r.demo);
+  DB.expenses = DB.expenses.filter(e=>!e.demo);
+  DB.wins     = DB.wins.filter(w=>!w.demo);
+  DB.schools.forEach(s=>{
+    s.outreach = (s.outreach||[]).filter(o=>!o.demo);
+    if(s._demoPrev){ s.status = s._demoPrev.status; s.tier = s._demoPrev.tier; delete s._demoPrev; }
+  });
+  DB.campWeeks.forEach(w=>{ w.capacity=0; w.registered=0; w.price=0; });
+  DB.settings.demo = false;
+  commit(); toast("Demo data cleared.");
+}
+
+/* =====================================================================
+   18. FORMS for each record type
+   ===================================================================== */
+const schoolOptions = ()=> [{value:"",label:"— none —"}].concat(sortBy(DB.schools,s=>s.name).map(s=>({value:s.id,label:s.name})));
+
+function formSchool(s){
+  const isNew = !s;
+  s = s || { id:uid("s"), status:"target", products:[], outreach:[], tags:[], approx:false };
+  formModal({
+    title: isNew ? "Add a school" : "Edit " + s.name,
+    values: Object.assign({}, s, {tags:(s.tags||[]).join(", ")}),
+    fields: [
+      {key:"name", label:"School name", placeholder:"e.g. Wilson Hill Elementary"},
+      {type:"row", fields:[{key:"district",label:"District"},{key:"city",label:"City"}]},
+      {type:"row", fields:[{key:"address",label:"Street address"},{key:"zip",label:"ZIP"}]},
+      {type:"row", fields:[
+        {key:"status",label:"Status",type:"select",options:STATUSES.map(x=>({value:x.k,label:x.label}))},
+        {key:"tier",label:"Tier",type:"select",options:TIERS.map(t=>({value:t,label:t||"— none —"}))}]},
+      {key:"products", label:"Products they run", type:"checks", options:PRODUCTS},
+      {type:"row", fields:[{key:"contactName",label:"Main contact"},{key:"contactRole",label:"Their role",placeholder:"PTA President, Principal…"}]},
+      {type:"row", fields:[{key:"contactEmail",label:"Email",type:"email"},{key:"contactPhone",label:"Phone",type:"tel"}]},
+      {type:"row", fields:[{key:"students",label:"Students",type:"number"},{key:"tags",label:"Tags",placeholder:"comma, separated"}]},
+      {type:"row", fields:[{key:"nextAction",label:"Next action"},{key:"nextActionDate",label:"Next action date",type:"date"}]},
+      {type:"row", fields:[{key:"lat",label:"Latitude",type:"number",step:"0.00001"},{key:"lng",label:"Longitude",type:"number",step:"0.00001"}]},
+      {key:"notes", label:"Notes", type:"textarea", placeholder:"Anything you know: budget cycle, past fundraisers, who really decides…"}
+    ],
+    note: isNew ? "" : (s.approx ? "This pin is a city-level approximation. Setting the real latitude/longitude marks it exact." : ""),
+    deleteFn: isNew ? null : ()=>{ DB.schools = DB.schools.filter(x=>x.id!==s.id); commit(); },
+    onSave: d=>{
+      d.tags = d.tags ? d.tags.split(",").map(t=>t.trim()).filter(Boolean) : [];
+      const before = {lat:s.lat, lng:s.lng};
+      const rec = Object.assign({}, s, d);
+      if(Number(d.lat)!==Number(before.lat) || Number(d.lng)!==Number(before.lng)) rec.approx = false;
+      rec.outreach = s.outreach || [];
+      if(isNew) DB.schools.push(rec);
+      else Object.assign(school(s.id), rec);
+      commit();
+      if(UI.selected===rec.id) openSchool(rec.id);
+    }
+  });
+}
+
+function formTouch(schoolId){
+  formModal({
+    title:"Log outreach",
+    values:{ date:todayISO(), type:"Email", schoolId: schoolId||UI.selected||"" },
+    fields:[
+      {key:"schoolId", label:"School", type:"select", options:schoolOptions()},
+      {type:"row", fields:[{key:"date",label:"Date",type:"date"},{key:"type",label:"Type",type:"select",options:TOUCH}]},
+      {key:"summary", label:"What happened", type:"textarea", placeholder:"Called the PTA president about the November window…"},
+      {key:"outcome", label:"Outcome", placeholder:"Asked for a proposal / no answer / said yes"},
+      {type:"row", fields:[{key:"nextAction",label:"Next action",placeholder:"Send Blueprint PDF"},{key:"nextActionDate",label:"By when",type:"date"}]}
+    ],
+    onSave: d=>{
+      const s = school(d.schoolId);
+      if(!s){ toast("Pick a school first.", "crit"); return; }
+      s.outreach = s.outreach || [];
+      s.outreach.push({id:uid("o"), date:d.date, type:d.type, summary:d.summary, outcome:d.outcome, followUp:d.nextAction});
+      if(d.nextAction){ s.nextAction = d.nextAction; s.nextActionDate = d.nextActionDate; }
+      if(s.status === "target") s.status = "contacted";
+      commit();
+      if(UI.selected===s.id) openSchool(s.id);
+    }
+  });
+}
+
+function formTodo(t, presetSchool){
+  const isNew = !t;
+  formModal({
+    title: isNew?"New to-do":"Edit to-do",
+    values: t || { area:"Ops", priority:"med", status:"open", due:"", schoolId:presetSchool||"" },
+    fields:[
+      {key:"title", label:"To-do"},
+      {type:"row", fields:[{key:"due",label:"Due",type:"date"},
+        {key:"priority",label:"Priority",type:"select",options:PRIOS.map(p=>({value:p.k,label:p.label}))}]},
+      {type:"row", fields:[{key:"area",label:"Area",type:"select",options:AREAS},
+        {key:"schoolId",label:"Related school",type:"select",options:schoolOptions()}]},
+      {key:"notes", label:"Notes", type:"textarea"}
+    ],
+    deleteFn: isNew?null:()=>{ DB.todos = DB.todos.filter(x=>x.id!==t.id); commit(); },
+    onSave: d=>{
+      if(!d.title) return;
+      if(isNew) addTodo(d);
+      else Object.assign(DB.todos.find(x=>x.id===t.id), d);
+      commit();
+    }
+  });
+}
+
+function formBrainDump(){
+  formModal({
+    title:"Brain dump",
+    note:"Paste every list you've got — phone notes, sticky notes, email flags. One to-do per line.",
+    values:{ area:"Ops", lines:"" },
+    fields:[
+      {key:"lines", label:"One per line", type:"textarea"},
+      {type:"row", fields:[{key:"area",label:"Area for all of them",type:"select",options:AREAS},
+        {key:"priority",label:"Priority",type:"select",options:PRIOS.map(p=>({value:p.k,label:p.label}))}]}
+    ],
+    saveLabel:"Add them all",
+    onSave: d=>{
+      const lines = (d.lines||"").split("\n").map(x=>x.trim()).filter(Boolean);
+      lines.reverse().forEach(l=>{
+        const p = parseQuickTodo(l);
+        addTodo({ title:p.title, due:p.due, priority: p.priority==="high"?"high":d.priority, area:d.area });
+      });
+      commit();
+      toast(lines.length + " to-do" + (lines.length===1?"":"s") + " added.");
+    }
+  });
+}
+
+function formRevenue(r, presetSchool){
+  const isNew = !r;
+  formModal({
+    title: isNew?"Add revenue":"Edit revenue",
+    values: r || { date:todayISO(), product:"Fundraising", schoolId:presetSchool||"" },
+    fields:[
+      {type:"row", fields:[{key:"date",label:"Date",type:"date"},{key:"amount",label:"Amount ($)",type:"number"}]},
+      {type:"row", fields:[{key:"product",label:"Product",type:"select",options:PRODUCTS},
+        {key:"schoolId",label:"School (optional)",type:"select",options:schoolOptions()}]},
+      {key:"note", label:"Note", placeholder:"Fall fundraiser payout, Week 2 tuition…"}
+    ],
+    deleteFn: isNew?null:()=>{ DB.revenue = DB.revenue.filter(x=>x.id!==r.id); commit(); },
+    onSave: d=>{
+      if(isNew) DB.revenue.push(Object.assign({id:uid("r")}, d));
+      else Object.assign(DB.revenue.find(x=>x.id===r.id), d);
+      UI.revYear = String(d.date).slice(0,4) || UI.revYear;
+      commit();
+    }
+  });
+}
+
+function formExpense(){
+  formModal({ title:"Add expense", values:{date:todayISO()},
+    fields:[
+      {type:"row", fields:[{key:"date",label:"Date",type:"date"},{key:"amount",label:"Amount ($)",type:"number"}]},
+      {type:"row", fields:[{key:"category",label:"Category",placeholder:"Materials, Marketing, Staff…"},{key:"note",label:"Note"}]}
+    ],
+    onSave: d=>{ DB.expenses.push(Object.assign({id:uid("e")}, d)); commit(); }});
+}
+
+function formCamp(w){
+  const isNew = !w;
+  formModal({ title: isNew?"Add camp week":"Edit "+w.name,
+    values: w || { year:new Date().getFullYear()+1, capacity:0, registered:0, price:0 },
+    fields:[
+      {type:"row", fields:[{key:"name",label:"Week name",placeholder:"Week 1"},{key:"year",label:"Year",type:"number"}]},
+      {type:"row", fields:[{key:"start",label:"Starts",type:"date"},{key:"end",label:"Ends",type:"date"}]},
+      {type:"row", fields:[{key:"capacity",label:"Seats offered",type:"number"},{key:"registered",label:"Registered",type:"number"}]},
+      {key:"price", label:"Price per camper ($)", type:"number"}
+    ],
+    deleteFn: isNew?null:()=>{ DB.campWeeks = DB.campWeeks.filter(x=>x.id!==w.id); commit(); },
+    onSave: d=>{ if(isNew) DB.campWeeks.push(Object.assign({id:uid("c")},d));
+                 else Object.assign(DB.campWeeks.find(x=>x.id===w.id), d); commit(); }});
+}
+
+function formDate(d0, presetSchool){
+  const isNew = !d0;
+  formModal({ title: isNew?"Add key date":"Edit date",
+    values: d0 || { date:"", type:"Fundraiser", schoolId:presetSchool||"" },
+    fields:[
+      {type:"row", fields:[{key:"date",label:"Date",type:"date"},{key:"type",label:"Type",type:"select",options:DATE_TYPES}]},
+      {key:"title", label:"What is it"},
+      {key:"schoolId", label:"Related school (optional)", type:"select", options:schoolOptions()},
+      {key:"detail", label:"Details", type:"textarea"}
+    ],
+    deleteFn: isNew?null:()=>{ DB.dates = DB.dates.filter(x=>x.id!==d0.id); commit(); },
+    onSave: d=>{ if(!d.title||!d.date) return;
+      if(isNew) DB.dates.push(Object.assign({id:uid("d")},d));
+      else Object.assign(DB.dates.find(x=>x.id===d0.id), d); commit(); }});
+}
+
+function formMilestone(m){
+  const isNew = !m;
+  formModal({ title: isNew?"Add milestone":"Edit milestone", values: m || {date:""},
+    fields:[ {key:"date",label:"Target date",type:"date"}, {key:"title",label:"Milestone"},
+             {key:"detail",label:"Detail",type:"textarea"} ],
+    deleteFn: isNew?null:()=>{ DB.milestones = DB.milestones.filter(x=>x.id!==m.id); commit(); },
+    onSave: d=>{ if(isNew) DB.milestones.push(Object.assign({id:uid("m"),done:false},d));
+                 else Object.assign(DB.milestones.find(x=>x.id===m.id), d); commit(); }});
+}
+
+function formGoal(g){
+  const isNew = !g;
+  formModal({ title: isNew?"Add goal":"Edit goal",
+    values: g || { status:"active", category:"Company", current:0, target:0, unit:"" },
+    fields:[
+      {key:"title", label:"Goal"},
+      {type:"row", fields:[{key:"current",label:"Where you are now",type:"number"},{key:"target",label:"Target",type:"number"}]},
+      {type:"row", fields:[{key:"unit",label:"Unit",placeholder:"$, schools, %"},{key:"due",label:"Due",type:"date"}]},
+      {type:"row", fields:[{key:"category",label:"Category",placeholder:"Fundraising, Camp, Company…"},
+        {key:"status",label:"Status",type:"select",options:[{value:"active",label:"Active"},{value:"hit",label:"Hit it"},{value:"parked",label:"Parked"}]}]},
+      {key:"detail", label:"How it's measured", type:"textarea"}
+    ],
+    deleteFn: isNew?null:()=>{ DB.goals = DB.goals.filter(x=>x.id!==g.id); commit(); },
+    onSave: d=>{ if(isNew) DB.goals.push(Object.assign({id:uid("g")},d));
+                 else Object.assign(DB.goals.find(x=>x.id===g.id), d); commit(); }});
+}
+
+function formMetric(m){
+  const isNew = !m;
+  formModal({ title: isNew?"Add metric":"Edit metric",
+    values: m || { cat:"Growth", value:0, target:0, unit:"", history:[] },
+    fields:[
+      {key:"label", label:"Metric"},
+      {type:"row", fields:[{key:"value",label:"Current value",type:"number"},{key:"target",label:"Target",type:"number"}]},
+      {type:"row", fields:[{key:"unit",label:"Unit",placeholder:"$, %, blank"},{key:"cat",label:"Group",placeholder:"Fundraising, Camp, Growth…"}]},
+      {key:"note", label:"How it's measured", type:"textarea"}
+    ],
+    deleteFn: isNew?null:()=>{ DB.metrics = DB.metrics.filter(x=>x.id!==m.id); commit(); },
+    onSave: d=>{
+      if(isNew){ DB.metrics.push(Object.assign({id:uid("k"),history:[]},d)); }
+      else {
+        const rec = DB.metrics.find(x=>x.id===m.id);
+        if(Number(d.value) !== Number(rec.value)){ rec.history = (rec.history||[]).concat(Number(d.value)).slice(-24); }
+        Object.assign(rec, d);
+      }
+      commit();
+    }});
+}
+
+function formQuote(q){
+  const isNew = !q;
+  formModal({ title: isNew?"Add a quote":"Edit quote", values: q||{},
+    fields:[ {key:"text",label:"Quote",type:"textarea"}, {key:"author",label:"Who said it"} ],
+    deleteFn: isNew?null:()=>{ DB.quotes = DB.quotes.filter(x=>x.id!==q.id); commit(); },
+    onSave: d=>{ if(!d.text) return;
+      if(isNew){ DB.quotes.push(Object.assign({id:uid("q")},d)); DB.settings.lastQuote = DB.quotes.length-1; }
+      else Object.assign(DB.quotes.find(x=>x.id===q.id), d);
+      commit(); }});
+}
+
+function formValueGroup(g){
+  const isNew = !g;
+  formModal({ title: isNew?"Add a values group":"Edit group", values: g||{},
+    fields:[ {key:"title",label:"Group title"}, {key:"blurb",label:"One-line description"} ],
+    deleteFn: isNew?null:()=>{ DB.valueGroups = DB.valueGroups.filter(x=>x.id!==g.id); commit(); },
+    onSave: d=>{ if(isNew) DB.valueGroups.push(Object.assign({id:uid("vg"),items:[]},d));
+                 else Object.assign(DB.valueGroups.find(x=>x.id===g.id), d); commit(); }});
+}
+function formValue(groupId, v){
+  const g = DB.valueGroups.find(x=>x.id===groupId); if(!g) return;
+  const isNew = !v;
+  formModal({ title: isNew?"Add a value":"Edit value", values: v||{icon:"◆"},
+    fields:[ {type:"row", fields:[{key:"icon",label:"Icon / emoji"},{key:"title",label:"Value"}]},
+             {key:"text",label:"What it means in practice",type:"textarea"} ],
+    deleteFn: isNew?null:()=>{ g.items = g.items.filter(x=>x.id!==v.id); commit(); },
+    onSave: d=>{ if(isNew) g.items.push(Object.assign({id:uid("v")},d));
+                 else Object.assign(g.items.find(x=>x.id===v.id), d); commit(); }});
+}
+function formMeta(){
+  formModal({ title:"Business details", values: DB.meta,
+    fields:[ {type:"row", fields:[{key:"business",label:"Business name"},{key:"owner",label:"Your name"}]},
+             {key:"tagline",label:"Tagline / mission line"},
+             {key:"email",label:"Email",type:"email"} ],
+    onSave: d=>{ Object.assign(DB.meta, d); commit(); }});
+}
+function formGitHub(){
+  const c = ghCfg();
+  formModal({
+    title:"Sync settings",
+    note:"Your token is stored only on this device and is never written into the data file.",
+    values:{ owner:c.owner, repo:c.repo, path:c.path||"data.json", branch:c.branch||"main", token:ghToken() },
+    saveLabel:"Save & sync",
+    fields:[
+      {type:"row", fields:[
+        {key:"owner", label:"GitHub account", placeholder:"TopKidEvents", help:"The owner of the private data repo."},
+        {key:"repo",  label:"Repo name", placeholder:"topkid-dashboard-data"}]},
+      {type:"row", fields:[
+        {key:"path",   label:"File in the repo", placeholder:"data.json"},
+        {key:"branch", label:"Branch", placeholder:"main"}]},
+      {key:"token", label:"Access token", type:"password",
+       placeholder:"github_pat_…",
+       help:"Fine-grained token, scoped to that one repo, with Contents: Read and write. Paste it yourself — it never leaves this device."}
+    ],
+    onSave: d=>{
+      DB.settings.github = { owner:d.owner.trim(), repo:d.repo.trim(),
+                             path:(d.path||"data.json").trim(), branch:(d.branch||"main").trim() };
+      ghSetToken((d.token||"").trim());
+      GH.sha = ""; GH.error = "";
+      save();
+      ghSync();
+    }
+  });
+}
+
+async function showHistory(){
+  openOverlay(`<div class="modal-back" data-act="backdrop"><div class="modal">
+    <header><h3>Version history</h3><button class="btn ghost sm" data-act="close">Close</button></header>
+    <div class="body"><div class="empty">Loading commits…</div></div></div></div>`);
+  try{
+    const commits = await ghHistory();
+    const rows = (commits||[]).map(c=>{
+      const d = new Date(c.commit.author.date);
+      return `<tr><td>${h(d.toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}))}
+          <div class="small muted">${h((c.commit.message||"").slice(0,60))}</div></td>
+        <td style="width:150px" class="nowrap">
+          <button class="btn sm ghost" data-act="gh-preview" data-sha="${h(c.sha)}">Preview</button>
+          <button class="btn sm ghost" data-act="gh-restore" data-sha="${h(c.sha)}">Restore</button></td></tr>`;
+    }).join("");
+    $(".modal .body").innerHTML = rows
+      ? `<p class="small" style="margin:0">Every save is a commit. Restoring brings a past version back as a new commit — nothing gets erased.</p>
+         <div class="card flush"><table><tbody>${rows}</tbody></table></div>`
+      : `<div class="empty">No commits yet.</div>`;
+  }catch(e){
+    $(".modal .body").innerHTML = `<div class="banner warn">${h(e.message)}</div>`;
+  }
+}
+async function previewVersion(sha){
+  try{
+    const d = await ghPull(sha);
+    toast(`That version: ${(d.schools||[]).length} schools · ${(d.todos||[]).length} to-dos · ${(d.revenue||[]).length} revenue rows`);
+  }catch(e){ toast(e.message,"crit"); }
+}
+function restoreVersion(sha){
+  confirmModal("Restore this version",
+    "The current state is already saved as its own commit, so this is reversible.",
+    async ()=>{
+      try{
+        const d = await ghPull(sha);
+        adopt(d);
+        DB.meta.updatedAt = new Date().toISOString();
+        saveLocalOnly();
+        await ghPush("Restore earlier version " + sha.slice(0,7));
+        render(); toast("Restored.");
+      }catch(e){ toast(e.message,"crit"); }
+    }, "Restore");
+}
+
+function formWin(){
+  formModal({ title:"Add a win", values:{date:todayISO()},
+    fields:[ {key:"text",label:"What happened",type:"textarea",placeholder:"A parent emailed to say…"},
+             {type:"row", fields:[{key:"date",label:"Date",type:"date"},{key:"source",label:"Source",placeholder:"Parent, teacher, PTA…"}]} ],
+    onSave: d=>{ if(!d.text) return; DB.wins.push(Object.assign({id:uid("w")},d)); commit(); }});
+}
+
+/* =====================================================================
+   19. EVENTS
+   ===================================================================== */
+document.addEventListener("click", e=>{
+  const t = e.target.closest("[data-act]"); if(!t) return;
+  const act = t.dataset.act, id = t.dataset.id;
+
+  /* backdrop only closes when the backdrop itself was clicked */
+  if(act === "backdrop"){ if(e.target === t) closeOverlay(); return; }
+  if(act === "quickadd-form") return;
+  e.preventDefault();
+
+  switch(act){
+    case "go": go(t.dataset.view); break;
+    case "close": closeOverlay(); break;
+    case "confirm-yes": { const f=_confirmYes; closeOverlay(); if(f) f(); break; }
+    case "form-delete": { const f=_formDelete; closeOverlay(); if(f) confirmModal("Delete this?","This can't be undone.",f); break; }
+    case "print": window.print(); break;
+    case "theme": {
+      const cur = document.documentElement.getAttribute("data-theme") || "auto";
+      const next = cur==="auto" ? "light" : cur==="light" ? "dark" : "auto";
+      if(next==="auto") document.documentElement.removeAttribute("data-theme");
+      else document.documentElement.setAttribute("data-theme", next);
+      DB.settings.theme = next; save(); toast("Theme: "+next);
+      if(UI.view==="schools") setTimeout(initMap,60);
+      break;
+    }
+    case "toggle-table": UI.showTable[t.dataset.key] = !UI.showTable[t.dataset.key]; render(); break;
+
+    /* quotes */
+    case "quote-next": DB.settings.lastQuote = ((DB.settings.lastQuote||0)+1) % Math.max(1,DB.quotes.length); commit(); break;
+    case "quote-show": DB.settings.lastQuote = Number(t.dataset.i)||0; commit(); break;
+    case "quote-add": formQuote(null); break;
+    case "quote-edit": formQuote(DB.quotes.find(q=>q.id===id)); break;
+    case "quote-del": confirmModal("Delete quote","Remove this quote from the rotation?",()=>{
+        DB.quotes = DB.quotes.filter(q=>q.id!==id); commit(); }); break;
+
+    /* to-dos */
+    case "todo-new": formTodo(null, t.dataset.school); break;
+    case "todo-quick": go("todos"); setTimeout(()=>{ const q=$("#qa"); if(q) q.focus(); },40); break;
+    case "todo-edit": formTodo(DB.todos.find(x=>x.id===id)); break;
+    case "todo-del": DB.todos = DB.todos.filter(x=>x.id!==id); commit(); break;
+    case "todo-toggle": { const x = DB.todos.find(y=>y.id===id);
+        x.status = x.status==="done" ? "open" : "done";
+        x.completedAt = x.status==="done" ? todayISO() : "";
+        save(); render(); if(UI.selected && $(".drawer")) openSchool(UI.selected); break; }
+    case "todo-filter": UI.todoFilter = t.dataset.v; render(); break;
+    case "todo-area":   UI.todoArea   = t.dataset.v; render(); break;
+    case "todo-dump": formBrainDump(); break;
+    case "todo-clear-done": confirmModal("Clear completed","Remove every completed to-do?",()=>{
+        DB.todos = DB.todos.filter(x=>x.status!=="done"); commit(); }, "Clear"); break;
+
+    /* schools & outreach */
+    case "school-new": formSchool(null); break;
+    case "school-edit": formSchool(school(id)); break;
+    case "school-open": openSchool(id); break;
+    case "school-del": { const s=school(id); confirmModal("Delete "+(s?s.name:"school"),
+        "This removes the school and its outreach history.", ()=>{
+          DB.schools = DB.schools.filter(x=>x.id!==id); UI.selected=null; closeOverlay(); commit(); }); break; }
+    case "school-filter": UI.schoolFilter = t.dataset.v; render(); break;
+    case "touch-add": formTouch(id || t.dataset.school); break;
+    case "touch-del": { const s=school(id);
+        s.outreach = s.outreach.filter(o=>o.id!==t.dataset.tid); save(); openSchool(id); renderSidebar(); break; }
+
+    /* money */
+    case "rev-add": formRevenue(null, t.dataset.school); break;
+    case "rev-edit": formRevenue(DB.revenue.find(x=>x.id===id)); break;
+    case "rev-year": UI.revYear = t.dataset.v; render(); break;
+    case "exp-add": formExpense(); break;
+    case "exp-del": DB.expenses = DB.expenses.filter(x=>x.id!==id); commit(); break;
+    case "camp-new": formCamp(null); break;
+    case "camp-edit": formCamp(DB.campWeeks.find(x=>x.id===id)); break;
+
+    /* dates, goals, metrics */
+    case "date-new": formDate(null, t.dataset.school); break;
+    case "date-edit": formDate(DB.dates.find(x=>x.id===id)); break;
+    case "ms-new": formMilestone(null); break;
+    case "ms-edit": formMilestone(DB.milestones.find(x=>x.id===id)); break;
+    case "ms-toggle": { const m=DB.milestones.find(x=>x.id===id); m.done=!m.done; commit(); break; }
+    case "goal-new": formGoal(null); break;
+    case "goal-edit": formGoal(DB.goals.find(x=>x.id===id)); break;
+    case "metric-new": formMetric(null); break;
+    case "metric-edit": formMetric(DB.metrics.find(x=>x.id===id)); break;
+
+    /* culture */
+    case "vgroup-new": formValueGroup(null); break;
+    case "vgroup-edit": formValueGroup(DB.valueGroups.find(x=>x.id===id)); break;
+    case "value-new": formValue(id, null); break;
+    case "value-edit": { const g=DB.valueGroups.find(x=>x.id===t.dataset.g);
+        formValue(t.dataset.g, g.items.find(v=>v.id===id)); break; }
+    case "meta-edit": formMeta(); break;
+    case "win-add": formWin(); break;
+    case "win-del": DB.wins = DB.wins.filter(w=>w.id!==id); commit(); break;
+
+    /* data */
+    case "gh-setup": formGitHub(); break;
+    case "gh-sync": ghSync(); break;
+    case "gh-history": showHistory(); break;
+    case "gh-preview": previewVersion(t.dataset.sha); break;
+    case "gh-restore": closeOverlay(); restoreVersion(t.dataset.sha); break;
+    case "gh-forget": confirmModal("Sign out of this device",
+        "Removes the token from this browser only. The repo and its history are untouched.",
+        ()=>{ ghSetToken(""); GH.mode="off"; GH.error=""; commit(); toast("Token removed from this device."); }, "Sign out"); break;
+    case "conflict-local":  closeOverlay(); ghSync({force:"local"});  break;
+    case "conflict-remote": closeOverlay(); ghSync({force:"remote"}); break;
+    case "conflict-download": {
+      download(`topkid-this-device-${todayISO()}.json`, JSON.stringify(DB,null,2));
+      if(_conflictRemote) setTimeout(()=>download(`topkid-other-device-${todayISO()}.json`, JSON.stringify(_conflictRemote,null,2)), 500);
+      toast("Both versions downloaded."); break;
+    }
+    case "sync-connect": syncConnectNew(); break;
+    case "sync-open": syncOpenExisting(); break;
+    case "sync-reconnect": syncReconnect(); break;
+    case "sync-disconnect": confirmModal("Disconnect the data file",
+        "The dashboard goes back to saving only in this browser. The file itself is left alone.",
+        ()=>syncDisconnect(), "Disconnect"); break;
+    case "export-json": exportJSON(); break;
+    case "import-json": importJSON(); break;
+    case "demo-load": loadDemo(); break;
+    case "demo-clear": clearDemo(); break;
+    case "reset-all": confirmModal("Reset everything",
+        "Your entries will be replaced by the starting data. Export a backup first if you want one.",
+        ()=>{ DB = clone(SEED); commit(); toast("Reset to the starting data."); }, "Reset"); break;
+  }
+});
+
+document.addEventListener("submit", e=>{
+  const f = e.target.closest('[data-act="quickadd-form"]'); if(!f) return;
+  e.preventDefault();
+  const inp = $("#qa"); const raw = inp.value.trim(); if(!raw) return;
+  const p = parseQuickTodo(raw);
+  addTodo({ title:p.title, due:p.due, priority:p.priority, area: UI.todoArea==="all" ? "Ops" : UI.todoArea });
+  inp.value = "";
+  save(); render();
+  setTimeout(()=>{ const q=$("#qa"); if(q) q.focus(); },30);
+});
+
+document.addEventListener("input", e=>{
+  if(e.target.id === "schoolq"){
+    UI.schoolQuery = e.target.value;
+    clearTimeout(window._sq);
+    window._sq = setTimeout(()=>{ render(); const q=$("#schoolq"); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); } }, 260);
+  }
+});
+
+document.addEventListener("keydown", e=>{
+  if(e.target.matches("input,textarea,select")) return;
+  if(e.key === "n" && !e.metaKey && !e.ctrlKey){ e.preventDefault(); formTodo(null); }
+  if(e.key === "/"){ e.preventDefault(); go("schools"); setTimeout(()=>{ const q=$("#schoolq"); if(q) q.focus(); },50); }
+});
+
+/* =====================================================================
+   20. BOOT
+   ===================================================================== */
+load();
+if(DB.settings.theme && DB.settings.theme !== "auto") document.documentElement.setAttribute("data-theme", DB.settings.theme);
+DB.settings.lastQuote = Math.floor(Math.random()*Math.max(1,DB.quotes.length));
+render();
+restoreFromFile();
+ghSync();
+/* push anything queued before the tab goes away */
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState === "hidden" && GH.mode === "pending"){ clearTimeout(ghTimer); ghPush().catch(()=>{}); }
+});
+window.openSchool = openSchool;
+</script>
+</body>
+</html>

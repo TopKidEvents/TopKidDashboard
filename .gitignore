@@ -1,0 +1,5 @@
+# Never let real dashboard data land in the PUBLIC page repo.
+data.json
+*-backup*.json
+topkid-dashboard-*.json
+.DS_Store
