@@ -399,9 +399,7 @@ const SEED = {
     email: "michael@topkidevents.com",
     fyStart: "01",            // fiscal year starts in January
     lastBackup: "",
-    homeBase: { name: "Camp site — Lord of Life Lutheran Church",
-                address: "2480 W Dublin-Granville Rd, Columbus, OH 43235",
-                lat: 40.0899, lng: -83.0665 }
+    homeBase: { name: "", address: "", lat: 0, lng: 0 }
   },
 
   /* ---------- Cultural values ---------- */
@@ -435,46 +433,20 @@ const SEED = {
   ],
 
   /* ---------- Goals & milestones ---------- */
-  goals: [
-    { id:"g1", title:"Book 12 school fundraisers for the 2026–27 school year", category:"Fundraising",
-      current:0, target:12, unit:"schools", due:"2027-05-31", status:"active",
-      detail:"Signed agreements, dates on the calendar. Counts Blueprint, TK Partner and Full Service." },
-    { id:"g2", title:"Fill Summer Camp 2027 to 80% capacity across all weeks", category:"Camp",
-      current:0, target:80, unit:"% full", due:"2027-06-01", status:"active",
-      detail:"Measured as total registrations ÷ total seats offered." },
-    { id:"g3", title:"Reach $150,000 in total revenue", category:"Company",
-      current:0, target:150000, unit:"$", due:"2027-06-30", status:"active",
-      detail:"Fundraising + Summer Camp combined." },
-    { id:"g4", title:"Convert 3 Blueprint schools up to TK Partner", category:"Fundraising",
-      current:0, target:3, unit:"upgrades", due:"2027-03-31", status:"active",
-      detail:"The clearest signal the program worked is a school buying more of it." },
-    { id:"g5", title:"Record all 6 lesson videos in studio quality", category:"Product",
-      current:0, target:6, unit:"videos", due:"2026-12-15", status:"active",
-      detail:"Partner Portal asset. Unlocks the TK Partner tier at scale." },
-    { id:"g6", title:"50 schools in the outreach pipeline", category:"Growth",
-      current:0, target:50, unit:"schools", due:"2026-12-31", status:"active",
-      detail:"Named school, named contact, at least one real touch logged." }
-  ],
+  goals: [],
 
-  milestones: [
-    { id:"m1", date:"2026-09-15", title:"Fall outreach push complete", detail:"Every target school contacted at least once before PTA budgets lock.", done:false },
-    { id:"m2", date:"2026-10-31", title:"First fall fundraiser runs", detail:"", done:false },
-    { id:"m3", date:"2026-12-15", title:"Lesson video library finished", detail:"", done:false },
-    { id:"m4", date:"2027-01-15", title:"Summer Camp 2027 registration opens", detail:"Early-bird pricing live on the site.", done:false },
-    { id:"m5", date:"2027-03-01", title:"Spring fundraiser slate locked", detail:"", done:false },
-    { id:"m6", date:"2027-06-14", title:"Camp 2027 Week 1 opens", detail:"", done:false }
-  ],
+  milestones: [],
 
   /* ---------- Metrics (edit values as you track them) ---------- */
   metrics: [
-    { id:"k1", label:"Schools run (all time)", value:0, target:20,  unit:"", cat:"Fundraising", note:"Schools marked Active or Past client.", auto:"schoolsRun", history:[] },
-    { id:"k2", label:"Avg raised per school", value:0, target:20000, unit:"$", cat:"Fundraising", note:"Total raised ÷ fundraisers run.", history:[] },
-    { id:"k3", label:"Pipeline → booked rate", value:0, target:25, unit:"%", cat:"Growth", note:"Booked ÷ schools contacted.", auto:"winRate", history:[] },
-    { id:"k4", label:"School renewal rate", value:0, target:70, unit:"%", cat:"Fundraising", note:"Schools that run it a second year.", history:[] },
-    { id:"k5", label:"Camp weeks run", value:4, target:8, unit:"", cat:"Camp", note:"Counted from the camp weeks on the Revenue tab.", auto:"campWeeks", history:[] },
-    { id:"k6", label:"Camper returns", value:0, target:50, unit:"%", cat:"Camp", note:"Campers who come back another week or year.", history:[] },
-    { id:"k7", label:"Email list size", value:0, target:1500, unit:"", cat:"Marketing", note:"Parents + PTA contacts.", history:[] },
-    { id:"k8", label:"Outreach touches this month", value:0, target:40, unit:"", cat:"Growth", note:"Auto-counted from the outreach log below.", auto:"touchesThisMonth", history:[] }
+    { id:"k1", label:"Schools run (all time)", value:0, target:0,  unit:"", cat:"Fundraising", note:"Schools marked Active or Past client.", auto:"schoolsRun", history:[] },
+    { id:"k2", label:"Avg raised per school", value:0, target:0, unit:"$", cat:"Fundraising", note:"Total raised ÷ fundraisers run.", history:[] },
+    { id:"k3", label:"Pipeline → booked rate", value:0, target:0, unit:"%", cat:"Growth", note:"Booked ÷ schools contacted.", auto:"winRate", history:[] },
+    { id:"k4", label:"School renewal rate", value:0, target:0, unit:"%", cat:"Fundraising", note:"Schools that run it a second year.", history:[] },
+    { id:"k5", label:"Camp weeks run", value:0, target:0, unit:"", cat:"Camp", note:"Counted from the camp weeks on the Revenue tab.", auto:"campWeeks", history:[] },
+    { id:"k6", label:"Camper returns", value:0, target:0, unit:"%", cat:"Camp", note:"Campers who come back another week or year.", history:[] },
+    { id:"k7", label:"Email list size", value:0, target:0, unit:"", cat:"Marketing", note:"Parents + PTA contacts.", history:[] },
+    { id:"k8", label:"Outreach touches this month", value:0, target:0, unit:"", cat:"Growth", note:"Auto-counted from the outreach log below.", auto:"touchesThisMonth", history:[] }
   ],
 
   /* ---------- Quotes ---------- */
@@ -489,54 +461,23 @@ const SEED = {
     { id:"q8", text:"Whether you think you can or think you can't, you're right.", author:"Henry Ford" }
   ],
 
-  /* ---------- Schools ----------
-     Seeded as pipeline targets around the Columbus metro.
-     Coordinates are CITY-LEVEL approximations (approx:true) so the map
-     has something to draw — open a school and set the real lat/lng, or
-     just fix the address. Statuses all start at "target"; move them as
-     you go.                                                            */
-  schools: [
-    mkSchool("Wilson Hill Elementary","Worthington City Schools","Worthington",40.0931,-83.0180),
-    mkSchool("Slate Hill Elementary","Worthington City Schools","Worthington",40.0931,-83.0180),
-    mkSchool("Liberty Elementary","Worthington City Schools","Worthington",40.0931,-83.0180),
-    mkSchool("Indian Run Elementary","Dublin City Schools","Dublin",40.0992,-83.1141),
-    mkSchool("Olde Sawmill Elementary","Dublin City Schools","Dublin",40.0992,-83.1141),
-    mkSchool("Deer Run Elementary","Dublin City Schools","Dublin",40.0992,-83.1141),
-    mkSchool("Alton Darby Elementary","Hilliard City Schools","Hilliard",40.0334,-83.1582),
-    mkSchool("Hilliard Crossing Elementary","Hilliard City Schools","Hilliard",40.0334,-83.1582),
-    mkSchool("Tyler Run Elementary","Olentangy Local Schools","Powell",40.1573,-83.0752),
-    mkSchool("Wyandot Run Elementary","Olentangy Local Schools","Powell",40.1573,-83.0752),
-    mkSchool("Wickliffe Progressive Elementary","Upper Arlington Schools","Upper Arlington",40.0248,-83.0621),
-    mkSchool("Annehurst Elementary","Westerville City Schools","Westerville",40.1262,-82.9291)
-  ],
+  /* ---------- Schools (yours load from your private data file) ---------- */
+  schools: [],
 
   /* ---------- Revenue & expenses (empty on purpose — add real numbers) ---------- */
   revenue: [],
   expenses: [],
 
   /* ---------- Camp weeks that ran in 2026 (seats/registrations to fill in) ---------- */
-  campWeeks: [
-    { id:"c1", name:"Week 1", year:2026, start:"2026-06-15", end:"2026-06-19", capacity:0, registered:0, price:0 },
-    { id:"c2", name:"Week 2", year:2026, start:"2026-06-22", end:"2026-06-26", capacity:0, registered:0, price:0 },
-    { id:"c3", name:"Week 3", year:2026, start:"2026-07-27", end:"2026-07-31", capacity:0, registered:0, price:0 },
-    { id:"c4", name:"Week 4", year:2026, start:"2026-08-03", end:"2026-08-07", capacity:0, registered:0, price:0 }
-  ],
+  campWeeks: [],
 
   /* ---------- Key dates ---------- */
-  dates: [
-    { id:"d1", date:"2026-09-08", title:"Fall PTA meeting season begins", type:"Outreach", detail:"Most PTAs set the year's fundraising calendar in Sept. Be in the room or in their inbox first." },
-    { id:"d2", date:"2026-10-01", title:"Fall fundraiser window opens", type:"Fundraiser", detail:"Oct–Nov is the strongest fall slot." },
-    { id:"d3", date:"2027-01-15", title:"Camp 2027 registration opens", type:"Camp", detail:"" },
-    { id:"d4", date:"2027-03-01", title:"Spring fundraiser window opens", type:"Fundraiser", detail:"Mar–Apr slot." },
-    { id:"d5", date:"2027-06-14", title:"Summer Camp 2027 — Week 1", type:"Camp", detail:"" }
-  ],
+  dates: [],
 
   /* ---------- To-dos ---------- */
   todos: [
-    { id:"t1", title:"Put every to-do from the other lists into this dashboard", area:"Ops", priority:"high", status:"open", due:todayISO(), notes:"Phone notes, sticky notes, email flags, whatever else. One home from here on.", created:todayISO() },
-    { id:"t2", title:"Set real statuses on the seeded schools (target vs client)", area:"Fundraising", priority:"high", status:"open", due:"", notes:"", created:todayISO() },
-    { id:"t3", title:"Enter 2026 camp revenue and camper counts", area:"Camp", priority:"med", status:"open", due:"", notes:"Per week, from ProCare.", created:todayISO() },
-    { id:"t4", title:"Back up the dashboard (Data tab → Export JSON)", area:"Ops", priority:"low", status:"open", due:"", notes:"Do this monthly.", created:todayISO() }
+    { id:"t1", title:"Import my data (Data & Backup → Import JSON)", area:"Ops", priority:"high", status:"open", due:"", notes:"", created:todayISO() },
+    { id:"t2", title:"Set up sync so this device stays in step", area:"Ops", priority:"high", status:"open", due:"", notes:"", created:todayISO() }
   ],
 
   /* ---------- Wins ---------- */
@@ -2373,7 +2314,7 @@ function formSchool(s){
     title: isNew ? "Add a school" : "Edit " + s.name,
     values: Object.assign({}, s, {tags:(s.tags||[]).join(", ")}),
     fields: [
-      {key:"name", label:"School name", placeholder:"e.g. Wilson Hill Elementary"},
+      {key:"name", label:"School name", placeholder:"e.g. Riverside Elementary"},
       {type:"row", fields:[{key:"district",label:"District"},{key:"city",label:"City"}]},
       {type:"row", fields:[{key:"address",label:"Street address"},{key:"zip",label:"ZIP"}]},
       {type:"row", fields:[
