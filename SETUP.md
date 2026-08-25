@@ -1,109 +1,108 @@
-# TopKid Dashboard — setup (about 15 minutes)
+# TopKid Dashboard — what's done, what's left
 
-You already have a GitHub account signed in on this Mac: **TopKidEvents**.
-So there's no account to create — skip straight to Step 1.
+## ✅ Already done
 
-Two repos, on purpose:
+| | |
+|---|---|
+| **Your dashboard is live** | <https://topkidevents.github.io/TopKidDashboard/> |
+| Page repo (public) | `TopKidEvents/TopKidDashboard` — HTML, icons, this guide |
+| Data repo (private) | `TopKidEvents/TopKidDashboard-Data` — will hold `data.json` |
+| GitHub Pages | enabled, built, HTTPS enforced |
 
-| Repo | Visibility | Holds |
-|---|---|---|
-| `topkid-dashboard` | **Public** | the page itself — HTML, icons. No business data. |
-| `topkid-dashboard-data` | **Private** | `data.json` — every school, contact, note, dollar figure. |
+**The public page holds none of your business data.** Before pushing it I stripped
+the built-in starter content out — no school names, no revenue figures, no camp
+venue. Verified on the live site: 0 schools and 0 goals in the page source. All of
+that now travels in your private data file instead.
 
-The page has to be public because GitHub Pages only serves public repos on the
-free plan. That's fine: the page is an empty shell until it's given a token.
-Anyone who finds the URL sees a dashboard with nothing in it.
-(If you'd rather the page were private too, that's GitHub Pro at $4/month —
-tell me and I'll switch it.)
+Your starter content wasn't thrown away — it's in
+`TopKid Business Folder/TopKid-Starter-Data.json` (12 Columbus-area target
+schools, the goals, the camp weeks, the values). Import it in Step 3 if you want
+it; skip it if you'd rather start clean.
 
 ---
 
-## Step 1 — create the two repos
+## Step 1 — make an access token  *(5 min, only you can do this)*
 
-This folder is already a git repo with the first commit made, so this is one
-command. Paste it into Terminal:
-
-```bash
-cd "/Users/topkid/TopKid Business Folder/TopKid Dashboard Site" && gh repo create topkid-dashboard --public --source=. --remote=origin --push && gh repo create topkid-dashboard-data --private --add-readme
-```
-
-## Step 2 — turn on GitHub Pages
-
-```bash
-echo '{"source":{"branch":"main","path":"/"}}' | gh api -X POST repos/TopKidEvents/topkid-dashboard/pages --input -
-```
-
-If that errors, do it by hand instead: the repo's **Settings → Pages →
-Source: Deploy from a branch → main → / (root) → Save**.
-
-Give it a minute, then your dashboard is live at:
-
-**https://topkidevents.github.io/topkid-dashboard/**
-
-## Step 3 — make an access token
-
-This part is yours — it's a credential, so nobody else should create or handle it.
+This is a credential, so it's yours alone to create. I won't handle it.
 
 1. Go to <https://github.com/settings/personal-access-tokens/new>
 2. **Token name:** `topkid-dashboard`
 3. **Expiration:** 1 year
-4. **Repository access:** *Only select repositories* → pick **`topkid-dashboard-data`** only
-5. **Permissions:** expand *Repository permissions* → set **Contents** to **Read and write**.
-   Leave everything else alone.
-6. Click **Generate token** and copy it. You only get to see it once.
+4. **Repository access:** *Only select repositories* → pick **`TopKidDashboard-Data`**
+   — the private one. Not the public page repo.
+5. **Permissions:** expand *Repository permissions* → set **Contents** to
+   **Read and write**. Leave everything else alone.
+6. **Generate token**, then copy it. GitHub shows it once.
 
-## Step 4 — connect the dashboard
+## Step 2 — get your existing data out of the old copy
 
-1. Open **https://topkidevents.github.io/topkid-dashboard/**
-2. **Data & Backup → Set up sync**
-3. Fill in:
-   - GitHub account: `TopKidEvents`
-   - Repo name: `topkid-dashboard-data`
-   - File: `data.json`
-   - Branch: `main`
-   - Access token: paste it
-4. **Save & sync.** The sidebar should show a green ● Synced.
+Skip if you haven't entered anything real yet.
 
-## Step 5 — move your existing data up
+Open your **local** dashboard the way you have been, then
+**Data & Backup → Export JSON**. Keep that file handy.
 
-Only if you've already entered real data locally.
+> Why: browser storage is tied to the exact address. Anything you typed at the
+> old address isn't visible at the new one — it's parked, not lost, and this
+> moves it across.
 
-1. Open your local copy, **Data & Backup → Export JSON**
-2. On the Pages URL, **Import JSON**, pick that file
-3. It pushes to the private repo within a few seconds
+## Step 3 — load your data into the live dashboard
 
-## Step 6 — put it on your phone
+Open <https://topkidevents.github.io/TopKidDashboard/> and go to
+**Data & Backup → Import JSON**. Pick either:
 
-1. Open **https://topkidevents.github.io/topkid-dashboard/** in Safari
-2. Share button → **Add to Home Screen** → it installs with the TopKid icon
-3. Open it, **Data & Backup → Set up sync**, same details, paste the same token
+- the file you exported in Step 2 (your real data), **or**
+- `TopKid-Starter-Data.json` from your business folder (the starter content)
 
-Both devices now read and write the same file. Edit on the phone at a PTA
-meeting, and it's on the Mac when you get home.
+**Do this before Step 4.** Importing first means your real data is what gets
+pushed up, rather than an empty dashboard.
+
+## Step 4 — turn on sync
+
+Still on the live dashboard: **Data & Backup → Set up sync**
+
+| Field | Value |
+|---|---|
+| GitHub account | `TopKidEvents` |
+| Repo name | `TopKidDashboard-Data` |
+| File in the repo | `data.json` |
+| Branch | `main` |
+| Access token | paste the token from Step 1 |
+
+**Save & sync.** The sidebar should show a green **● Synced**. Check
+<https://github.com/TopKidEvents/TopKidDashboard-Data> — `data.json` will be there.
+
+## Step 5 — put it on your phone
+
+1. Open <https://topkidevents.github.io/TopKidDashboard/> in Safari
+2. Share → **Add to Home Screen** — it installs with the TopKid icon
+3. Open it → **Data & Backup → Set up sync** → same five fields, same token
+
+Both devices now read and write the same file. Log outreach at a PTA meeting on
+your phone; it's on the Mac when you get home.
 
 ---
 
 ## How it behaves
 
-- **Every save is a commit.** Data & Backup → *Version history* lists them.
-  *Restore* brings any past version back **as a new commit** — nothing is erased,
-  so restoring is itself undoable.
-- **Two devices edited at once?** You get a conflict box showing both, with
-  timestamps and record counts. Nothing is auto-discarded, and whichever you
+- **Every save is a commit.** *Data & Backup → Version history* lists them.
+  *Restore* brings a past version back **as a new commit**, so restoring is
+  itself undoable and nothing is ever erased.
+- **Two devices edited at once?** You get a box showing both, with timestamps and
+  record counts, and you choose. Nothing is auto-discarded; the version you
   don't pick stays in the history.
-- **Offline?** It keeps working from local storage and pushes when you're back.
-- **Belt and braces:** on the Mac you can *also* connect a local `TopKid-Data.json`
-  (Data & Backup → Data file) so there's a copy on disk independent of GitHub.
+- **Offline?** Keeps working locally and pushes when you're back.
+- **Extra belt on the Mac:** *Data & Backup → Data file* also writes a plain
+  `TopKid-Data.json` to your business folder, independent of GitHub.
 
 ## Token safety
 
-- Scoped to the data repo alone. It cannot touch anything else in your account.
-- Stored per-device, and stripped out of the data before every push — it is
-  never committed to the repo. (Verified by test.)
-- Lost your phone? <https://github.com/settings/tokens> → delete the token.
-  Then make a new one and re-enter it on your remaining devices.
-- The `.gitignore` in this folder blocks `data.json` from ever being committed
-  to the *public* page repo by accident.
+- Scoped to the data repo alone — it cannot touch anything else in your account.
+- Stored per-device and stripped from the payload before every push, so it is
+  never committed. Verified by test.
+- Lost your phone? <https://github.com/settings/tokens> → delete the token, then
+  make a new one and re-enter it on your other devices.
+- If you ever paste real data into the **public** repo by accident, tell me —
+  it has to be scrubbed from git history, not just deleted.
 
 ## Updating the page later
 
