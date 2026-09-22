@@ -233,6 +233,7 @@ input[type=text],input[type=date],input[type=month],input[type=number],input[typ
 input:focus,select:focus,textarea:focus{outline:2px solid var(--purple);outline-offset:1px;background:var(--surface)}
 textarea{min-height:84px;resize:vertical;font-family:inherit}
 .field.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field.row3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px}
 .checkrow{display:flex;gap:14px;flex-wrap:wrap}
 .checkrow label{display:flex;align-items:center;gap:6px;font-size:13.5px;text-transform:none;letter-spacing:0;color:var(--ink-2);font-weight:400;margin:0}
 
@@ -995,6 +996,78 @@ function years(){
 }
 
 /* =====================================================================
+   3b. ADDRESS → MAP PIN
+   A map is a coordinate grid, so an address has to be turned into
+   lat/lng before it can be drawn. That translation lives in a database,
+   not a formula — we ask OpenStreetMap's public one. No key, no account.
+   It needs internet, and it is rate-limited to ~1 request/second, so the
+   bulk pass below is deliberately slow. Typing coordinates by hand still
+   works and is always the fallback.
+   ===================================================================== */
+function hasPin(s){ return isFinite(s.lat) && isFinite(s.lng) && (Number(s.lat) || Number(s.lng)); }
+function addressQuery(d, name){
+  const street = [d.address, d.city, d.state, d.zip].map(x=>String(x||"").trim()).filter(Boolean);
+  if(String(d.address||"").trim()) return street.join(", ");
+  // no street address — a school name plus its town usually resolves anyway
+  const byName = [name, d.city, d.state].map(x=>String(x||"").trim()).filter(Boolean);
+  return byName.length > 1 ? byName.join(", ") : street.join(", ");
+}
+async function geocode(q){
+  const url = "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=" + encodeURIComponent(q);
+  let r;
+  try{ r = await fetch(url, {headers:{Accept:"application/json"}}); }
+  catch(e){ throw new Error("Couldn't reach the lookup service — check your internet."); }
+  if(!r.ok) throw new Error("Lookup service returned " + r.status);
+  const j = await r.json();
+  if(!j.length) throw new Error("No match for that address");
+  return { lat:+Number(j[0].lat).toFixed(5), lng:+Number(j[0].lon).toFixed(5), label:j[0].display_name || q };
+}
+/* Tries the most precise thing first and falls back. A street address can be
+   mistyped or simply missing from the map data, while schools themselves are
+   usually tagged by name — so the name is a genuinely good second try. The
+   last resort is the town centre, which gets flagged approximate rather than
+   pretending to be exact. */
+async function geocodeSchool(d){
+  const clean = x => String(x||"").trim();
+  const attempts = [];
+  if(clean(d.address)) attempts.push({ q:[d.address,d.city,d.state,d.zip].map(clean).filter(Boolean).join(", "), approx:false, how:"street address" });
+  const byName = [d.name,d.city,d.state].map(clean).filter(Boolean);
+  if(clean(d.name) && byName.length>1) attempts.push({ q:byName.join(", "), approx:false, how:"school name" });
+  const town = [d.city,d.state].map(clean).filter(Boolean);
+  if(town.length) attempts.push({ q:town.join(", "), approx:true, how:"town centre" });
+  if(!attempts.length) throw new Error("Nothing to look up — add an address, or a city");
+  let last;
+  for(let i=0;i<attempts.length;i++){
+    try{ return Object.assign(await geocode(attempts[i].q), {approx:attempts[i].approx, how:attempts[i].how}); }
+    catch(e){ last = e; if(i < attempts.length-1) await new Promise(r=>setTimeout(r,1200)); }
+  }
+  throw last;
+}
+async function placeOne(s, quiet){
+  try{
+    const r = await geocodeSchool(s);
+    s.lat = r.lat; s.lng = r.lng; s.approx = r.approx;
+    commit();
+    if(!quiet) toast("Placed " + s.name + " on the map" + (r.approx ? " — town centre only, so the pin is approximate." : " from its " + r.how + "."));
+    if(UI.selected === s.id && $(".drawer")) openSchool(s.id);
+    return true;
+  }catch(e){ if(!quiet) toast(e.message + " — you can type the coordinates by hand instead.","crit"); return false; }
+}
+async function placeAllMissing(){
+  const list = DB.schools.filter(s=>!hasPin(s));
+  if(!list.length) return toast("Every school is already on the map.");
+  toast("Looking up " + list.length + " address" + (list.length>1?"es":"") + "… about " + Math.ceil(list.length*1.2) + "s.");
+  let ok=0, fail=0;
+  for(let i=0;i<list.length;i++){
+    if(await placeOne(list[i], true)) ok++; else fail++;
+    if(i < list.length-1) await new Promise(r=>setTimeout(r,1200));  // respect the 1/sec limit
+    if(fail >= 4 && ok === 0){ toast("Lookups are all failing — stopping. Check your internet.","crit"); break; }
+  }
+  commit();
+  toast(ok + " placed" + (fail ? ", " + fail + " couldn't be found — add those by hand" : "") + ".");
+}
+
+/* =====================================================================
    4. MODAL + FORM ENGINE
    ===================================================================== */
 function closeOverlay(){ $("#overlay").innerHTML = ""; document.body.style.overflow=""; }
@@ -1017,6 +1090,9 @@ function fieldHTML(f, v){
     case "checks":
       input = `<div class="checkrow">` + f.options.map(o=>
         `<label><input type="checkbox" name="${f.key}" value="${h(o)}"${(Array.isArray(val)&&val.includes(o))?" checked":""}> ${h(o)}</label>`).join("") + `</div>`; break;
+    case "geo": input = `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button type="button" class="btn" data-act="geo-find">📍 Find it on the map</button>
+        <span class="small muted" id="geostatus">Fills the coordinates below from the address above.</span></div>`; break;
     case "number": input = `<input type="number" name="${f.key}" value="${h(val)}" step="${f.step||"any"}" placeholder="${h(f.placeholder||"")}">`; break;
     case "date":   input = `<input type="date" name="${f.key}" value="${h(val)}">`; break;
     case "month":  input = `<input type="month" name="${f.key}" value="${h(String(val).slice(0,7))}">`; break;
@@ -1030,7 +1106,7 @@ function formModal(opts){
   const {title, fields, values={}, saveLabel="Save", deleteFn=null, note=""} = opts;
   _formSave = (data)=>{ opts.onSave(data); };
   const rows = fields.map(f=>{
-    if(f.type === "row") return `<div class="field row2">${f.fields.map(sf=>fieldHTML(sf, values[sf.key])).join("")}</div>`;
+    if(f.type === "row") return `<div class="field ${f.fields.length===3?"row3":"row2"}">${f.fields.map(sf=>fieldHTML(sf, values[sf.key])).join("")}</div>`;
     return fieldHTML(f, values[f.key]);
   }).join("");
   openOverlay(`
@@ -1052,6 +1128,7 @@ function formModal(opts){
     e.preventDefault();
     const fd = new FormData(e.target), data = {};
     fields.flatMap(f=> f.type==="row" ? f.fields : [f]).forEach(f=>{
+      if(f.type==="geo") return;                       // display-only control
       if(f.type==="checks") data[f.key] = fd.getAll(f.key);
       else if(f.type==="number"){ const raw=fd.get(f.key); data[f.key] = raw==="" ? 0 : Number(raw); }
       else data[f.key] = (fd.get(f.key)||"").toString().trim();
@@ -1597,10 +1674,14 @@ function viewSchools(){
   STATUSES.forEach(st=> counts[st.k] = DB.schools.filter(s=>s.status===st.k).length);
   const active = DB.schools.filter(s=>["client","booked"].includes(s.status)).length;
   const approxN = DB.schools.filter(s=>s.approx).length;
+  const noPin = DB.schools.filter(s=>!hasPin(s));
 
   return pageHead("Schools & Map", `${DB.schools.length} schools · ${active} booked or active · ${DB.schools.length-active} in the pipeline`,
       `<button class="btn primary" data-act="school-new">+ Add school</button>
        <button class="btn" data-act="touch-add">+ Log outreach</button>`)
+  + (noPin.length ? `<div class="banner warn"><b>${noPin.length} school${noPin.length>1?"s aren't":" isn't"} on the map yet.</b>
+      <span class="small">${h(noPin.slice(0,3).map(s=>s.name).join(", "))}${noPin.length>3?"…":""} — ${noPin.length>1?"they have":"it has"} no coordinates.</span>
+      <div class="spacer"></div><button class="btn sm" data-act="geo-all">Find ${noPin.length>1?"them":"it"} from the address</button></div>` : "")
   + (approxN ? `<div class="banner info"><b>${approxN} pins are city-level approximations.</b>
       Open a school and set its address or lat/lng to place it exactly.<div class="spacer"></div></div>` : "")
   + `<div class="card flush" style="margin-bottom:16px">
@@ -1648,7 +1729,7 @@ let _map = null, _layer = null;
 function initMap(){
   const el = document.getElementById("map");
   if(!el) return;
-  const pts = filteredSchools().filter(s=> isFinite(s.lat) && isFinite(s.lng) && (s.lat||s.lng));
+  const pts = filteredSchools().filter(hasPin);
   const base = DB.meta.homeBase;
 
   if(typeof L === "undefined"){ return fallbackMap(el, pts, base); }
@@ -1758,7 +1839,10 @@ function openSchool(id){
           <dt>Phone</dt><dd>${s.contactPhone?`<a href="tel:${h(s.contactPhone)}">${h(s.contactPhone)}</a>`:`<span class="muted">—</span>`}</dd>
           <dt>Address</dt><dd>${h(s.address||"—")}${s.zip?" "+h(s.zip):""}</dd>
           <dt>Students</dt><dd>${s.students?h(s.students):`<span class="muted">—</span>`}</dd>
-          <dt>Map pin</dt><dd class="small">${isFinite(s.lat)&&s.lat?`${s.lat}, ${s.lng} ${s.approx?`<span class="tag warn">approximate</span>`:""}`:`<span class="muted">not set</span>`}</dd>
+          <dt>Map pin</dt><dd class="small">${hasPin(s)
+            ? `${s.lat}, ${s.lng} ${s.approx?`<span class="tag warn">approximate</span>`:""}`
+            : `<span class="muted">not set — this school isn't on the map.</span>
+               <button class="btn sm" data-act="geo-one" data-id="${s.id}" style="margin-left:6px">📍 Find from address</button>`}</dd>
         </dl>
         ${s.notes?`<div style="margin-top:14px"><div class="lbl small muted" style="text-transform:uppercase;letter-spacing:.07em;font-weight:700">Notes</div>
           <div style="white-space:pre-wrap;margin-top:5px">${h(s.notes)}</div></div>`:""}
@@ -2309,14 +2393,16 @@ const schoolOptions = ()=> [{value:"",label:"— none —"}].concat(sortBy(DB.sc
 
 function formSchool(s){
   const isNew = !s;
+  UI._formSchoolId = s ? s.id : null;
   s = s || { id:uid("s"), status:"target", products:[], outreach:[], tags:[], approx:false };
   formModal({
     title: isNew ? "Add a school" : "Edit " + s.name,
     values: Object.assign({}, s, {tags:(s.tags||[]).join(", ")}),
     fields: [
       {key:"name", label:"School name", placeholder:"e.g. Riverside Elementary"},
-      {type:"row", fields:[{key:"district",label:"District"},{key:"city",label:"City"}]},
-      {type:"row", fields:[{key:"address",label:"Street address"},{key:"zip",label:"ZIP"}]},
+      {key:"district", label:"District"},
+      {key:"address", label:"Street address", placeholder:"2400 Snouffer Rd"},
+      {type:"row", fields:[{key:"city",label:"City"},{key:"state",label:"State"},{key:"zip",label:"ZIP"}]},
       {type:"row", fields:[
         {key:"status",label:"Status",type:"select",options:STATUSES.map(x=>({value:x.k,label:x.label}))},
         {key:"tier",label:"Tier",type:"select",options:TIERS.map(t=>({value:t,label:t||"— none —"}))}]},
@@ -2325,6 +2411,7 @@ function formSchool(s){
       {type:"row", fields:[{key:"contactEmail",label:"Email",type:"email"},{key:"contactPhone",label:"Phone",type:"tel"}]},
       {type:"row", fields:[{key:"students",label:"Students",type:"number"},{key:"tags",label:"Tags",placeholder:"comma, separated"}]},
       {type:"row", fields:[{key:"nextAction",label:"Next action"},{key:"nextActionDate",label:"Next action date",type:"date"}]},
+      {key:"_geo", label:"Map pin", type:"geo"},
       {type:"row", fields:[{key:"lat",label:"Latitude",type:"number",step:"0.00001"},{key:"lng",label:"Longitude",type:"number",step:"0.00001"}]},
       {key:"notes", label:"Notes", type:"textarea", placeholder:"Anything you know: budget cycle, past fundraisers, who really decides…"}
     ],
@@ -2335,11 +2422,23 @@ function formSchool(s){
       const before = {lat:s.lat, lng:s.lng};
       const rec = Object.assign({}, s, d);
       if(Number(d.lat)!==Number(before.lat) || Number(d.lng)!==Number(before.lng)) rec.approx = false;
+      if(!hasPin(rec)) rec.approx = false;
       rec.outreach = s.outreach || [];
       if(isNew) DB.schools.push(rec);
       else Object.assign(school(s.id), rec);
       commit();
       if(UI.selected===rec.id) openSchool(rec.id);
+      // saved without a pin but with an address? place it without being asked.
+      if(!hasPin(rec) && addressQuery(rec, rec.name).trim()){
+        const live = school(rec.id);
+        if(live){
+          toast("Finding " + live.name + " on the map…");
+          placeOne(live, true).then(done=>{
+            toast(done ? "Placed " + live.name + " on the map."
+                       : live.name + " saved, but that address didn't resolve — add coordinates by hand.");
+          });
+        }
+      }
     }
   });
 }
@@ -2692,6 +2791,27 @@ document.addEventListener("click", e=>{
         DB.todos = DB.todos.filter(x=>x.status!=="done"); commit(); }, "Clear"); break;
 
     /* schools & outreach */
+    case "geo-find": {
+      const form = $("#theform"); if(!form) break;
+      const get = n => { const el = form.querySelector(`[name="${n}"]`); return el ? el.value : ""; };
+      const st = $("#geostatus");
+      const cur = UI._formSchoolId ? (school(UI._formSchoolId)||{}) : {};
+      const d = { name:get("name")||cur.name, address:get("address")||cur.address, city:get("city")||cur.city,
+                  state:get("state")||cur.state, zip:get("zip")||cur.zip };
+      if(!String(d.address||"").trim() && !String(d.city||"").trim()){
+        st.textContent = "Type an address, or at least a city, first."; st.style.color = "var(--crit)"; break; }
+      st.textContent = "Looking up…"; st.style.color = "var(--muted)";
+      geocodeSchool(d).then(r=>{
+        form.querySelector('[name="lat"]').value = r.lat;
+        form.querySelector('[name="lng"]').value = r.lng;
+        st.textContent = (r.approx ? "≈ town centre only — " : "✓ matched by " + r.how + " — ")
+                       + (r.label.length>64 ? r.label.slice(0,64)+"…" : r.label);
+        st.style.color = r.approx ? "var(--warn)" : "var(--good)";
+      }).catch(e=>{ st.textContent = "✕ " + e.message + " — type the coordinates by hand instead."; st.style.color = "var(--crit)"; });
+      break;
+    }
+    case "geo-one": placeOne(school(id)); break;
+    case "geo-all": placeAllMissing(); break;
     case "school-new": formSchool(null); break;
     case "school-edit": formSchool(school(id)); break;
     case "school-open": openSchool(id); break;
